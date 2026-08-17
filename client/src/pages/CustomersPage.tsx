@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import type { FilterState, OverviewData } from '../types';
 import { Users, UserPlus, CreditCard, Award, Cake, Gift, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
@@ -49,7 +49,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
     if (filters.endDate) params.append('endDate', filters.endDate);
     if (search.trim()) params.append('search', search.trim());
 
-    axios.get(`http://localhost:3001/api/dashboard/customers?${params.toString()}`)
+    api.get(`/api/dashboard/customers?${params.toString()}`)
       .then(res => {
         setCustomers(res.data.customers || []);
         setBirthdayCustomers(res.data.birthdayCustomers || []);

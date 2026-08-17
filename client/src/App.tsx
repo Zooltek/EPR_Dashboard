@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { OverviewPage } from './pages/OverviewPage';
@@ -59,7 +59,7 @@ export const App: React.FC = () => {
 
   // Fetch Filter Dropdown Options
   useEffect(() => {
-    axios.get('http://localhost:3001/api/admin/filters')
+    api.get('/api/admin/filters')
       .then(res => setFilterOptions(res.data))
       .catch(err => console.error('Erro ao carregar opções de filtro:', err));
   }, []);
@@ -78,7 +78,7 @@ export const App: React.FC = () => {
     if (filters.familiaId) params.append('familiaId', filters.familiaId);
     if (filters.colecaoId) params.append('colecaoId', filters.colecaoId);
 
-    axios.get(`http://localhost:3001/api/dashboard/overview?${params.toString()}`)
+    api.get(`/api/dashboard/overview?${params.toString()}`)
       .then(res => setOverviewData(res.data))
       .catch(err => console.error('Erro ao carregar visão geral:', err))
       .finally(() => setLoading(false));
@@ -89,7 +89,7 @@ export const App: React.FC = () => {
   }, [filters]);
 
   const handleRefreshSync = () => {
-    axios.post('http://localhost:3001/api/admin/sync-pbi')
+    api.post('/api/admin/sync-pbi')
       .then(() => fetchOverview())
       .catch(err => console.error(err));
   };

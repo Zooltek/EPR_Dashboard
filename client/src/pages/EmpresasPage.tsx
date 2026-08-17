@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import { Store } from 'lucide-react';
 
 export const EmpresasPage: React.FC = () => {
@@ -8,7 +8,7 @@ export const EmpresasPage: React.FC = () => {
 
   useEffect(() => {
     setLoading(true);
-    axios.get('http://localhost:3001/api/admin/lojas')
+    api.get('/api/admin/lojas')
       .then(res => setLojas(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

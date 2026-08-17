@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import type { FilterState } from '../types';
 import { Package, AlertTriangle, Layers, DollarSign, Tag, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 
@@ -36,7 +36,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ filters }) => {
     if (filters.lojaId) params.append('lojaId', filters.lojaId);
     if (search.trim()) params.append('search', search.trim());
 
-    axios.get(`http://localhost:3001/api/dashboard/products?${params.toString()}`)
+    api.get(`/api/dashboard/products?${params.toString()}`)
       .then(res => setData(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

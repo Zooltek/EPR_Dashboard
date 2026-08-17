@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import type { FilterState } from '../types';
 import { Store, Award, ArrowUpDown } from 'lucide-react';
 
@@ -34,7 +34,7 @@ export const StoreComparisonPage: React.FC<StoreComparisonPageProps> = ({ filter
     if (filters.startDate) params.append('startDate', filters.startDate);
     if (filters.endDate) params.append('endDate', filters.endDate);
 
-    axios.get(`http://localhost:3001/api/dashboard/store-comparison?${params.toString()}`)
+    api.get(`/api/dashboard/store-comparison?${params.toString()}`)
       .then(res => setStores(res.data.stores || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

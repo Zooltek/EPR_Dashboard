@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import { api } from '../services/api';
 import { FileCheck, RefreshCw } from 'lucide-react';
 
 export const PbiFilesPage: React.FC = () => {
@@ -9,7 +9,7 @@ export const PbiFilesPage: React.FC = () => {
 
   const fetchLogs = () => {
     setLoading(true);
-    axios.get('http://localhost:3001/api/admin/pbi-files')
+    api.get('/api/admin/pbi-files')
       .then(res => setLogs(res.data || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
@@ -21,7 +21,7 @@ export const PbiFilesPage: React.FC = () => {
 
   const handleManualSync = () => {
     setSyncing(true);
-    axios.post('http://localhost:3001/api/admin/sync-pbi')
+    api.post('/api/admin/sync-pbi')
       .then(res => {
         alert(`Sincronização executada! ${res.data.count} arquivo(s) verificado(s).`);
         fetchLogs();

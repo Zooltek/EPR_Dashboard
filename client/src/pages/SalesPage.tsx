@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
-import axios from 'axios';
+import { api } from '../services/api';
 import type { FilterState, OverviewData } from '../types';
 import { ShoppingBag, Clock, UserCheck, CreditCard } from 'lucide-react';
 
@@ -22,7 +22,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({ overviewData, filters, the
     if (filters.endDate) params.append('endDate', filters.endDate);
     if (filters.lojaId) params.append('lojaId', filters.lojaId);
 
-    axios.get(`http://localhost:3001/api/dashboard/sales?${params.toString()}`)
+    api.get(`/api/dashboard/sales?${params.toString()}`)
       .then(res => setSalesByHour(res.data.salesByHour || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));

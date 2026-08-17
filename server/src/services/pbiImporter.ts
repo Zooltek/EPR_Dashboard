@@ -10,7 +10,7 @@ const parser = new XMLParser({
   trimValues: true,
 });
 
-function ensureArray<T>(val: any): T[] {
+function ensureArray(val: any): any[] {
   if (!val) return [];
   if (Array.isArray(val)) return val;
   return [val];

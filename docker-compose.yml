@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  epr_dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: epr_dashboard_app
+    restart: always
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - FTP_HOST=${FTP_HOST:-ftp.consuldatasistemas.com.br}
+      - FTP_PORT=${FTP_PORT:-21}
+      - FTP_USER=${FTP_USER:-consuldata}
+      - FTP_PASSWORD=${FTP_PASSWORD:-8F1h#7ok}
+      - FTP_DIR=${FTP_DIR:-clientes/fabricio}
+      - SYNC_CRON=${SYNC_CRON:-*/5 * * * *}
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./data:/app/server/data
+      - ./downloads:/app/server/downloads
