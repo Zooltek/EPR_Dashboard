@@ -120,6 +120,13 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
       }
     }
   } catch (err: any) {
+    // Delete corrupted downloaded file so subsequent sync can download cleanly
+    try {
+      if (fs.existsSync(zipFilePath)) {
+        fs.unlinkSync(zipFilePath);
+      }
+    } catch (_) {}
+
     db.prepare(`
       INSERT INTO pbi_arquivo (nome_arquivo, cnpj_loja, loja_id, empresa_id, data_pbi, hora_pbi, tamanho_bytes, status, mensagem_erro)
       VALUES (?, ?, ?, ?, ?, ?, ?, 'ERRO', ?)
@@ -138,20 +145,37 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
 
   // 5. Execute DB Import inside a transaction
   const transaction = db.transaction(() => {
-    // Loja.xml
-    if (xmlMap['loja.xml']) {
-      const parsedXml = parser.parse(xmlMap['loja.xml']);
-      const lojaObj = parsedXml?.cadLoja?.loja;
-      if (lojaObj) {
-        const erpId = lojaObj.idLoja ? Number(lojaObj.idLoja) : store.id;
-        const storeName = String(lojaObj.xFant || lojaObj.xNome || `Loja ${cnpj}`);
-        db.prepare(`
-          UPDATE loja SET 
-            id_loja_erp = ?,
-            nome = ?, 
-            status = 'ATIVO' 
-          WHERE cnpj = ?
-        `).run(erpId, storeName, cnpj);
+    // Loja.xml - Busca por qualquer arquivo xml relacionado a loja
+    const lojaXmlKey = Object.keys(xmlMap).find(k => k.includes('loja'));
+    if (lojaXmlKey && xmlMap[lojaXmlKey]) {
+      try {
+        const parsedXml = parser.parse(xmlMap[lojaXmlKey]);
+        const lojaRaw = parsedXml?.cadLoja?.loja || parsedXml?.loja || parsedXml?.cadLojas?.loja || parsedXml?.lojas?.loja || parsedXml?.root?.loja;
+        const lojaObj = Array.isArray(lojaRaw) ? lojaRaw[0] : lojaRaw;
+        if (lojaObj) {
+          const erpId = lojaObj.idLoja ? Number(lojaObj.idLoja) : (lojaObj.id ? Number(lojaObj.id) : (lojaObj.id_loja_erp ? Number(lojaObj.id_loja_erp) : store.id));
+          const storeName = String(
+            lojaObj.xFant || lojaObj.xNome || lojaObj.nome_fantasia || lojaObj.razao_social || lojaObj.nome || lojaObj.fantasia || ''
+          ).trim();
+
+          if (storeName && !storeName.toLowerCase().startsWith('loja 00') && !storeName.toLowerCase().startsWith('loja 11')) {
+            db.prepare(`
+              UPDATE loja SET 
+                id_loja_erp = ?,
+                nome = ?, 
+                status = 'ATIVO' 
+              WHERE cnpj = ?
+            `).run(erpId, storeName, cnpj);
+          } else if (erpId && erpId !== 1) {
+            db.prepare(`
+              UPDATE loja SET 
+                id_loja_erp = ?
+              WHERE cnpj = ?
+            `).run(erpId, cnpj);
+          }
+        }
+      } catch (err: any) {
+        console.error(`[PBI Importer] Erro ao processar Loja.xml:`, err.message);
       }
     }
 

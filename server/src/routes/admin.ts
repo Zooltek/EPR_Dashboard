@@ -48,6 +48,32 @@ adminRouter.post('/lojas', (req: Request, res: Response) => {
   }
 });
 
+adminRouter.put('/lojas/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { nome, id_loja_erp } = req.body;
+  if (!nome) {
+    return res.status(400).json({ error: 'Nome da loja é obrigatório.' });
+  }
+
+  try {
+    const existing = db.prepare(`SELECT * FROM loja WHERE id = ?`).get(id) as any;
+    if (!existing) {
+      return res.status(404).json({ error: 'Loja não encontrada.' });
+    }
+
+    db.prepare(`
+      UPDATE loja SET 
+        nome = ?,
+        id_loja_erp = COALESCE(?, id_loja_erp)
+      WHERE id = ?
+    `).run(nome.trim(), id_loja_erp ? Number(id_loja_erp) : null, id);
+
+    res.json({ success: true, message: 'Loja atualizada com sucesso.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 3. Arquivos PBI Log & Status
 adminRouter.get('/pbi-files', (req: Request, res: Response) => {
   const { status, cnpj } = req.query;
