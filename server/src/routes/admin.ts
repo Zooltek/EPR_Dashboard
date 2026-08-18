@@ -1,9 +1,38 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import { db } from '../db/database';
 import { syncPbiFromFtp } from '../services/ftpSyncService';
+import { importPbiZip } from '../services/pbiImporter';
 
 export const adminRouter = Router();
+
+const downloadsDir = path.join(__dirname, '../../downloads');
+if (!fs.existsSync(downloadsDir)) {
+  fs.mkdirSync(downloadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, downloadsDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB max per zip
+  fileFilter: (req, file, cb) => {
+    if (file.originalname.toLowerCase().endsWith('.zip')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas arquivos .zip são permitidos.'));
+    }
+  },
+});
 
 // 1. Filter Dropdown Options API
 adminRouter.get('/filters', (req: Request, res: Response) => {
@@ -24,7 +53,7 @@ adminRouter.get('/filters', (req: Request, res: Response) => {
   });
 });
 
-// 2. Lojas List / Create
+// 2. Lojas List / Create / Update
 adminRouter.get('/lojas', (req: Request, res: Response) => {
   const sql = `SELECT * FROM loja ORDER BY id ASC`;
   const lojas = db.prepare(sql).all();
@@ -111,5 +140,31 @@ adminRouter.post('/sync-pbi', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Admin API] Erro no sync-pbi:', err);
     res.status(500).json({ error: err.message || 'Erro interno na sincronização' });
+  }
+});
+
+// 5. Upload Direto de Arquivos PBI (.zip)
+adminRouter.post('/upload-pbi', upload.array('files', 20), async (req: Request, res: Response) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: 'Nenhum arquivo .zip enviado.' });
+    }
+
+    const results = [];
+    for (const file of files) {
+      console.log(`[Upload Direto] Processando arquivo: ${file.originalname} (${file.size} bytes)`);
+      const result = await importPbiZip(file.path);
+      results.push(result);
+    }
+
+    res.json({
+      success: true,
+      message: `${files.length} arquivo(s) enviado(s) e processado(s) com sucesso!`,
+      results,
+    });
+  } catch (err: any) {
+    console.error('[Admin API] Erro no upload direto:', err);
+    res.status(500).json({ error: err.message || 'Falha ao processar arquivos' });
   }
 });

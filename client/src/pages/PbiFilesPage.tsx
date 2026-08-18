@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from '../services/api';
-import { FileCheck, RefreshCw } from 'lucide-react';
+import { FileCheck, RefreshCw, UploadCloud, CheckCircle2, AlertCircle, FileArchive } from 'lucide-react';
 
 export const PbiFilesPage: React.FC = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadFeedback, setUploadFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchLogs = () => {
     setLoading(true);
@@ -25,14 +29,49 @@ export const PbiFilesPage: React.FC = () => {
       .then(res => {
         const count = res.data.remoteFilesFound?.length ?? res.data.downloadedFiles?.length ?? res.data.importResults?.length ?? res.data.count ?? 0;
         const msg = res.data.ftpMessage || `Sincronização executada! ${count} arquivo(s) verificado(s).`;
-        alert(msg);
+        setUploadFeedback({ type: 'success', message: msg });
         fetchLogs();
       })
       .catch(err => {
         const errMsg = err.response?.data?.error || err.message;
-        alert(`Erro na sincronização: ${errMsg}`);
+        setUploadFeedback({ type: 'error', message: `Erro na sincronização: ${errMsg}` });
       })
       .finally(() => setSyncing(false));
+  };
+
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    const zipFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.zip'));
+    if (zipFiles.length === 0) {
+      setUploadFeedback({ type: 'error', message: 'Selecione apenas arquivos compactados com extensão .zip' });
+      return;
+    }
+
+    setUploading(true);
+    setUploadFeedback(null);
+
+    const formData = new FormData();
+    zipFiles.forEach(file => {
+      formData.append('files', file);
+    });
+
+    try {
+      const res = await api.post('/api/admin/upload-pbi', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      const processedCount = res.data.results?.filter((r: any) => r.success)?.length || 0;
+      setUploadFeedback({
+        type: 'success',
+        message: `${processedCount} de ${zipFiles.length} arquivo(s) processado(s) com sucesso na base de dados!`,
+      });
+      fetchLogs();
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || err.message;
+      setUploadFeedback({ type: 'error', message: `Erro no upload: ${errMsg}` });
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const formatBytes = (bytes: number) => {
@@ -45,6 +84,100 @@ export const PbiFilesPage: React.FC = () => {
 
   return (
     <div className="page-body">
+      {/* Direct Upload Area */}
+      <div className="charts-grid">
+        <div className="chart-card col-12">
+          <div className="chart-header">
+            <span className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <UploadCloud size={20} color="var(--primary)" /> Upload Direto de Pacotes PBI (.zip)
+            </span>
+          </div>
+
+          <div
+            onDragOver={e => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={e => {
+              e.preventDefault();
+              setIsDragOver(false);
+              if (e.dataTransfer.files) handleUploadFiles(e.dataTransfer.files);
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              border: `2px dashed ${isDragOver ? 'var(--primary)' : 'var(--border-color)'}`,
+              backgroundColor: isDragOver ? 'var(--primary-light)' : 'var(--bg-card-hover)',
+              borderRadius: 12,
+              padding: '30px 20px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 10,
+            }}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              multiple
+              accept=".zip"
+              style={{ display: 'none' }}
+              onChange={e => {
+                if (e.target.files && e.target.files.length > 0) {
+                  handleUploadFiles(e.target.files);
+                }
+              }}
+            />
+
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              backgroundColor: 'var(--primary-light)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--primary)',
+            }}>
+              {uploading ? (
+                <RefreshCw size={26} className="spin" />
+              ) : (
+                <FileArchive size={26} />
+              )}
+            </div>
+
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '0.95rem', margin: 0, color: 'var(--text-main)' }}>
+                {uploading ? 'Processando arquivos PBI...' : 'Arraste os arquivos .zip aqui ou clique para selecionar'}
+              </p>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                Suporta múltiplos arquivos simultâneos (ex: <code>PBI_11235753000283_20260818_125103.zip</code>)
+              </p>
+            </div>
+          </div>
+
+          {/* Feedback banner */}
+          {uploadFeedback && (
+            <div style={{
+              marginTop: 12,
+              padding: '10px 14px',
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              fontSize: '0.85rem',
+              backgroundColor: uploadFeedback.type === 'success' ? 'var(--success-light)' : 'var(--danger-light)',
+              color: uploadFeedback.type === 'success' ? 'var(--success)' : 'var(--danger)',
+              border: `1px solid ${uploadFeedback.type === 'success' ? 'var(--success)' : 'var(--danger)'}`,
+            }}>
+              {uploadFeedback.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              <span>{uploadFeedback.message}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Logs Table */}
       <div className="charts-grid">
         <div className="chart-card col-12">
           <div className="chart-header">
@@ -54,7 +187,7 @@ export const PbiFilesPage: React.FC = () => {
 
             <button className="btn-primary" onClick={handleManualSync} disabled={syncing}>
               <RefreshCw size={14} className={syncing ? 'spin' : ''} />
-              <span>{syncing ? 'Verificando FTP/PBI...' : 'Verificar / Sincronizar PBI'}</span>
+              <span>{syncing ? 'Verificando FTP/PBI...' : 'Verificar / Sincronizar FTP'}</span>
             </button>
           </div>
 
