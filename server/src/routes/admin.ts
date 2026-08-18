@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { db } from '../db/database';
-import { syncPbiFromFtp } from '../services/ftpSyncService';
+import { runFullSync } from '../services/ftpSyncService';
 import { importPbiZip } from '../services/pbiImporter';
 
 export const adminRouter = Router();
@@ -132,11 +132,12 @@ adminRouter.get('/pbi-files', (req: Request, res: Response) => {
   res.json(logs);
 });
 
-// 4. Trigger Manual Sync PBI & Real FTP
+// 4. Trigger Manual Sync PBI (Local e/ou FTP)
 adminRouter.post('/sync-pbi', async (req: Request, res: Response) => {
   try {
-    const result = await syncPbiFromFtp(req.body);
-    res.json({ success: true, count: result.importResults?.length || 0, ...result });
+    const { localDir, ftp } = req.body || {};
+    const result = await runFullSync({ localDir, ftp });
+    res.json({ count: result.importResults?.length || 0, ...result });
   } catch (err: any) {
     console.error('[Admin API] Erro no sync-pbi:', err);
     res.status(500).json({ error: err.message || 'Erro interno na sincronização' });
