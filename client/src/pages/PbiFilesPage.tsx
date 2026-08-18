@@ -23,10 +23,15 @@ export const PbiFilesPage: React.FC = () => {
     setSyncing(true);
     api.post('/api/admin/sync-pbi')
       .then(res => {
-        alert(`Sincronização executada! ${res.data.count} arquivo(s) verificado(s).`);
+        const count = res.data.remoteFilesFound?.length ?? res.data.downloadedFiles?.length ?? res.data.importResults?.length ?? res.data.count ?? 0;
+        const msg = res.data.ftpMessage || `Sincronização executada! ${count} arquivo(s) verificado(s).`;
+        alert(msg);
         fetchLogs();
       })
-      .catch(err => alert(`Erro na sincronização: ${err.message}`))
+      .catch(err => {
+        const errMsg = err.response?.data?.error || err.message;
+        alert(`Erro na sincronização: ${errMsg}`);
+      })
       .finally(() => setSyncing(false));
   };
 

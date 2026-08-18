@@ -81,8 +81,9 @@ adminRouter.get('/pbi-files', (req: Request, res: Response) => {
 adminRouter.post('/sync-pbi', async (req: Request, res: Response) => {
   try {
     const result = await syncPbiFromFtp(req.body);
-    res.json({ success: true, ...result });
+    res.json({ success: true, count: result.importResults?.length || 0, ...result });
   } catch (err: any) {
-    res.status(500).json({ error: err.message });
+    console.error('[Admin API] Erro no sync-pbi:', err);
+    res.status(500).json({ error: err.message || 'Erro interno na sincronização' });
   }
 });
