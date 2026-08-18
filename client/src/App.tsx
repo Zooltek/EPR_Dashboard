@@ -13,6 +13,7 @@ import type { FilterState, FilterOptions, OverviewData } from './types';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('visao-geral');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Theme Mode (Dark / Light)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -101,6 +102,8 @@ export const App: React.FC = () => {
         setActiveTab={setActiveTab} 
         companyLogo={companyLogo}
         setCompanyLogo={setCompanyLogo}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
       
       <main className="main-content">
@@ -113,6 +116,7 @@ export const App: React.FC = () => {
           theme={theme}
           toggleTheme={toggleTheme}
           onRefreshSync={handleRefreshSync}
+          onToggleMobileMenu={() => setIsMobileSidebarOpen(prev => !prev)}
         />
 
         {activeTab === 'visao-geral' && (

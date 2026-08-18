@@ -3,7 +3,7 @@
 # ==========================================
 
 # 1. Stage: Build Frontend (Vite + React)
-FROM node:20-alpine AS client-builder
+FROM node:22-alpine AS client-builder
 WORKDIR /app/client
 COPY client/package*.json ./
 RUN npm ci
@@ -11,7 +11,7 @@ COPY client/ ./
 RUN npm run build
 
 # 2. Stage: Build Backend (Express + TypeScript)
-FROM node:20-alpine AS server-builder
+FROM node:22-alpine AS server-builder
 WORKDIR /app/server
 RUN apk add --no-cache python3 make g++ gcc
 COPY server/package*.json ./
@@ -20,7 +20,7 @@ COPY server/ ./
 RUN npm run build
 
 # 3. Stage: Production Runner Image
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 # Configurações de Fuso Horário Brasil
@@ -43,6 +43,7 @@ COPY --from=server-builder /app/server/dist ./dist
 COPY --from=client-builder /app/client/dist /app/client/dist
 
 # Cria diretórios persistentes para o SQLite e arquivos FTP
+COPY PBI /app/PBI
 RUN mkdir -p /app/server/data /app/server/downloads
 
 EXPOSE 3001

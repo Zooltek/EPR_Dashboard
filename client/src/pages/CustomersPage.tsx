@@ -176,7 +176,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
             </span>
 
             {/* Search Input */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '6px 12px', minWidth: 300 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, backgroundColor: 'var(--bg-card-hover)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '6px 12px', flex: '1 1 200px', maxWidth: '100%' }}>
               <Search size={16} color="var(--text-muted)" />
               <input
                 type="text"

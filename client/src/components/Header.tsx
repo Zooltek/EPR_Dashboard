@@ -1,6 +1,13 @@
 import React from 'react';
+import { 
+  Calendar, 
+  Filter, 
+  RefreshCw, 
+  Sun, 
+  Moon,
+  Menu
+} from 'lucide-react';
 import type { FilterState, FilterOptions } from '../types';
-import { Calendar, Filter, RefreshCw, Sun, Moon } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: string;
@@ -11,6 +18,7 @@ interface HeaderProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   onRefreshSync?: () => void;
+  onToggleMobileMenu?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   toggleTheme,
   onRefreshSync,
+  onToggleMobileMenu,
 }) => {
   const titles: Record<string, { title: string; subtitle: string }> = {
     'visao-geral': { title: 'Visão Geral', subtitle: 'Acompanhamento consolidado dos principais KPIs e faturamento.' },
@@ -34,7 +43,6 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const currentInfo = titles[activeTab] || { title: 'Dashboard', subtitle: '' };
-
   const totalStores = storesStatus.length || filterOptions.lojas.length || 1;
   const updatedStores = storesStatus.filter(s => s.status === 'ATUALIZADA').length || (totalStores > 0 ? 1 : 0);
   const lastSyncTime = storesStatus[0]?.data_processamento || storesStatus[0]?.data_pbi || 'Hoje 14:15';
@@ -46,7 +54,6 @@ export const Header: React.FC<HeaderProps> = ({
   const handleLojaChange = (newLojaId: string) => {
     setFilters(prev => {
       let newVendedorId = prev.vendedorId;
-      // Se selecionou uma loja específica e o vendedor atual não pertence a ela, reseta o vendedor
       if (newLojaId && prev.vendedorId) {
         const seller = filterOptions.vendedores.find(v => String(v.id) === String(prev.vendedorId));
         if (seller && String(seller.loja_id) !== String(newLojaId)) {
@@ -57,7 +64,6 @@ export const Header: React.FC<HeaderProps> = ({
     });
   };
 
-  // Vendedores filtrados conforme a loja selecionada
   const availableVendedores = filterOptions.vendedores.filter(v => {
     if (!filters.lojaId) return true;
     return String(v.loja_id) === String(filters.lojaId);
@@ -66,13 +72,19 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="app-header">
       <div className="header-top">
-        <div className="page-title">
-          <h2>{currentInfo.title}</h2>
-          <p>{currentInfo.subtitle}</p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {onToggleMobileMenu && (
+            <button className="mobile-menu-toggle" onClick={onToggleMobileMenu} title="Abrir Menu">
+              <Menu size={20} />
+            </button>
+          )}
+          <div className="page-title">
+            <h2>{currentInfo.title}</h2>
+            <p>{currentInfo.subtitle}</p>
+          </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Light / Dark Theme Toggle Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Alternar entre Tema Claro e Escuro">
             {theme === 'dark' ? <Sun size={14} color="#f59e0b" /> : <Moon size={14} color="#6366f1" />}
             <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
@@ -94,14 +106,13 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Global Filter Bar */}
       <div className="filter-bar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
           <Filter size={16} color="var(--primary)" />
           <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-main)' }}>FILTROS:</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '1 1 auto', overflowX: 'auto' }}>
           <button
             className={`btn-period ${filters.period === 'today' ? 'active' : ''}`}
             onClick={() => handlePeriodChange('today')}
@@ -176,7 +187,7 @@ export const Header: React.FC<HeaderProps> = ({
           </select>
         </div>
 
-        {/* Vendedor Dropdown (Dependente da Loja Selecionada) */}
+        {/* Vendedor Dropdown */}
         <div className="filter-group">
           <span className="filter-label">Vendedor:</span>
           <select
