@@ -43,23 +43,50 @@ export const SalesPage: React.FC<SalesPageProps> = ({ overviewData, filters, the
   };
 
   const salesByHourOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'bar', toolbar: { show: false }, background: 'transparent' },
+    chart: { 
+      type: 'bar', 
+      toolbar: { 
+        show: true,
+        tools: {
+          download: true,
+          selection: true,
+          zoom: true,
+          zoomin: true,
+          zoomout: true,
+          pan: true,
+          reset: true,
+        },
+        autoSelected: 'zoom',
+      },
+      zoom: {
+        enabled: true,
+        type: 'x',
+        autoScaleYaxis: true,
+      },
+      background: 'transparent' 
+    },
     theme: { mode: isDark ? 'dark' : 'light' },
     colors: ['#3b82f6'],
     plotOptions: { 
       bar: { 
         borderRadius: 4, 
-        columnWidth: '45%',
+        columnWidth: salesByHour.length > 18 ? '70%' : '45%',
         dataLabels: { position: 'top' }
       } 
     },
     dataLabels: {
-      enabled: true,
+      enabled: salesByHour.length <= 15,
       formatter: (val) => formatCurrency(Number(val)),
       style: { colors: [dataLabelColor], fontSize: '11px', fontWeight: 600 },
       offsetY: -20,
     },
-    xaxis: { categories: salesByHour.map(h => h.hora), labels: { style: { colors: textColor } } },
+    xaxis: { 
+      categories: salesByHour.map(h => h.hora), 
+      labels: { 
+        hideOverlappingLabels: true,
+        style: { colors: textColor } 
+      } 
+    },
     yaxis: { labels: { formatter: (val) => formatCurrency(Number(val)), style: { colors: textColor } } },
     tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => formatCurrency(Number(val)) } },
     grid: { borderColor: gridColor },

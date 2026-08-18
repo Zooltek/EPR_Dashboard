@@ -57,37 +57,101 @@ export const OverviewPage: React.FC<OverviewPageProps> = ({ data, loading, theme
     );
   };
 
+  const hasManyDays = charts.salesByDay.length > 25;
+
   const salesByDayOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'area', toolbar: { show: false }, background: 'transparent' },
+    chart: { 
+      type: 'area', 
+      toolbar: { 
+        show: true,
+        tools: {
+          download: true,
+          selection: true,
+          zoom: true,
+          zoomin: true,
+          zoomout: true,
+          pan: true,
+          reset: true,
+        },
+        autoSelected: 'zoom',
+      }, 
+      zoom: {
+        enabled: true,
+        type: 'x',
+        autoScaleYaxis: true,
+      },
+      background: 'transparent' 
+    },
     theme: { mode: isDark ? 'dark' : 'light' },
     colors: ['#6366f1'],
     stroke: { curve: 'smooth', width: 3 },
     fill: { type: 'gradient', gradient: { opacityFrom: 0.4, opacityTo: 0.05 } },
     dataLabels: { enabled: false },
-    xaxis: { categories: charts.salesByDay.map(d => d.data.substring(5)), labels: { style: { colors: textColor } } },
+    xaxis: { 
+      categories: charts.salesByDay.map(d => d.data.substring(5)), 
+      labels: { 
+        rotate: -45,
+        rotateAlways: false,
+        hideOverlappingLabels: true,
+        trim: true,
+        style: { colors: textColor, fontSize: '11px' } 
+      },
+      tickAmount: Math.min(charts.salesByDay.length, 14),
+    },
     yaxis: { labels: { formatter: (val) => formatCurrency(Number(val)), style: { colors: textColor } } },
     tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => formatCurrency(Number(val)) } },
     grid: { borderColor: gridColor },
   };
 
   const salesCountOptions: ApexCharts.ApexOptions = {
-    chart: { type: 'bar', toolbar: { show: false }, background: 'transparent' },
+    chart: { 
+      type: 'bar', 
+      toolbar: { 
+        show: true,
+        tools: {
+          download: true,
+          selection: true,
+          zoom: true,
+          zoomin: true,
+          zoomout: true,
+          pan: true,
+          reset: true,
+        },
+        autoSelected: 'zoom',
+      }, 
+      zoom: {
+        enabled: true,
+        type: 'x',
+        autoScaleYaxis: true,
+      },
+      background: 'transparent' 
+    },
     theme: { mode: isDark ? 'dark' : 'light' },
     colors: ['#10b981'],
     plotOptions: { 
       bar: { 
         borderRadius: 4, 
-        columnWidth: '50%',
+        columnWidth: charts.salesByDay.length > 30 ? '80%' : '50%',
         dataLabels: { position: 'top' }
       } 
     },
     dataLabels: {
-      enabled: true,
+      enabled: !hasManyDays, // Desativa rótulos nas barras se houver muitos dias para não embolar; o valor detalhado aparece no tooltip e ao dar zoom
       formatter: (val) => `${formatNumber(Number(val))} un`,
       style: { colors: [dataLabelColor], fontSize: '11px', fontWeight: 600 },
       offsetY: -20,
     },
-    xaxis: { categories: charts.salesByDay.map(d => d.data.substring(5)), labels: { style: { colors: textColor } } },
+    xaxis: { 
+      categories: charts.salesByDay.map(d => d.data.substring(5)), 
+      labels: { 
+        rotate: -45,
+        rotateAlways: false,
+        hideOverlappingLabels: true,
+        trim: true,
+        style: { colors: textColor, fontSize: '11px' } 
+      },
+      tickAmount: Math.min(charts.salesByDay.length, 14),
+    },
     yaxis: { labels: { formatter: (val) => formatNumber(Number(val)), style: { colors: textColor } } },
     tooltip: { theme: isDark ? 'dark' : 'light', y: { formatter: (val) => `${formatNumber(Number(val))} vendas` } },
     grid: { borderColor: gridColor },

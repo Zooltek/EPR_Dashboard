@@ -755,6 +755,50 @@ body {
   }
 }
 
+/* ApexCharts Toolbar & Zoom Controls Styling */
+.apexcharts-toolbar {
+  top: -30px !important;
+  right: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 2px 6px !important;
+  border-radius: var(--radius-sm) !important;
+  background-color: var(--bg-card-hover) !important;
+  border: 1px solid var(--border-color) !important;
+  z-index: 5 !important;
+}
+
+.apexcharts-toolbar svg {
+  fill: var(--text-muted) !important;
+  transition: all 0.2s ease !important;
+}
+
+.apexcharts-toolbar svg:hover {
+  fill: var(--primary) !important;
+}
+
+.apexcharts-selected svg {
+  fill: var(--primary) !important;
+}
+
+.apexcharts-menu {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-sm) !important;
+  box-shadow: var(--shadow-card) !important;
+  color: var(--text-main) !important;
+}
+
+.apexcharts-menu-item {
+  color: var(--text-main) !important;
+}
+
+.apexcharts-menu-item:hover {
+  background-color: var(--bg-card-hover) !important;
+  color: var(--primary) !important;
+}
+
 @media (max-width: 480px) {
   .kpi-grid {
     grid-template-columns: 1fr;
@@ -769,3 +813,4 @@ body {
     font-size: 0.775rem;
   }
 }
+
