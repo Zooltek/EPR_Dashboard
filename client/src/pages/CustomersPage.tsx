@@ -133,14 +133,13 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
                   <th>Data Nascimento</th>
                   <th>CPF</th>
                   <th>E-mail de Contato</th>
-                  <th>Ação Comercial</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20 }}>Buscando aniversariantes...</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20 }}>Buscando aniversariantes...</td></tr>
                 ) : birthdayCustomers.length === 0 ? (
-                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Nenhum cliente faz aniversário no período filtrado.</td></tr>
+                  <tr><td colSpan={5} style={{ textAlign: 'center', padding: 20, color: 'var(--text-muted)' }}>Nenhum cliente faz aniversário no período filtrado.</td></tr>
                 ) : (
                   birthdayCustomers.map(b => (
                     <tr key={b.id_cliente}>
@@ -153,11 +152,6 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
                       <td>{b.data_nasc}</td>
                       <td><code>{b.cpf || '-'}</code></td>
                       <td>{b.email || <span style={{ color: 'var(--text-dim)' }}>Não informado</span>}</td>
-                      <td>
-                        <button className="btn-period active" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
-                          🎁 Enviar Cupom / Parabéns
-                        </button>
-                      </td>
                     </tr>
                   ))
                 )}

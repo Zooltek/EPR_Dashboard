@@ -109,15 +109,6 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ filters }) => {
           <div className="kpi-value" style={{ color: 'var(--danger)' }}>{formatNumber(kpis.produtos_sem_estoque)}</div>
           <div className="kpi-badge down">Atenção para reposição</div>
         </div>
-
-        <div className="kpi-card">
-          <div className="kpi-header">
-            <span className="kpi-title">Estoque Baixo (≤ 2 un)</span>
-            <div className="kpi-icon" style={{ color: 'var(--warning)', backgroundColor: 'var(--warning-light)' }}><AlertTriangle size={18} /></div>
-          </div>
-          <div className="kpi-value" style={{ color: 'var(--warning)' }}>{formatNumber(kpis.estoque_baixo)}</div>
-          <div className="kpi-badge neutral">Risco de ruptura</div>
-        </div>
       </div>
 
       {/* Paginated Ruptura Table with Real-time Search */}
@@ -169,38 +160,24 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ filters }) => {
                   <th>Cor</th>
                   <th>Tamanho</th>
                   <th>Qtd Estoque</th>
-                  <th>Situação da Grade</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>Carregando produtos...</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20 }}>Carregando produtos...</td></tr>
                 ) : ruptureList.length === 0 ? (
-                  <tr><td colSpan={7} style={{ textAlign: 'center', padding: 20 }}>Nenhum produto encontrado.</td></tr>
+                  <tr><td colSpan={6} style={{ textAlign: 'center', padding: 20 }}>Nenhum produto encontrado.</td></tr>
                 ) : (
-                  ruptureList.map((r, idx) => {
-                    const isZero = r.qtd <= 0;
-                    const isLow = r.qtd > 0 && r.qtd <= 2;
-                    return (
-                      <tr key={idx}>
-                        <td><code>{r.ref_id}</code></td>
-                        <td><strong>{r.produto}</strong></td>
-                        <td>{r.marca || '-'}</td>
-                        <td>{r.cor || '-'}</td>
-                        <td><span className="kpi-badge neutral">Tam {r.tamanho}</span></td>
-                        <td style={{ fontWeight: 700 }}>{r.qtd} un</td>
-                        <td>
-                          {isZero ? (
-                            <span className="badge-status erro">Ruptura (Sem Estoque)</span>
-                          ) : isLow ? (
-                            <span className="badge-status aguardando">Estoque Baixo</span>
-                          ) : (
-                            <span className="badge-status atualizada">Disponível</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
+                  ruptureList.map((r, idx) => (
+                    <tr key={idx}>
+                      <td><code>{r.ref_id}</code></td>
+                      <td><strong>{r.produto}</strong></td>
+                      <td>{r.marca || '-'}</td>
+                      <td>{r.cor || '-'}</td>
+                      <td><span className="kpi-badge neutral">Tam {r.tamanho}</span></td>
+                      <td style={{ fontWeight: 700 }}>{r.qtd} un</td>
+                    </tr>
+                  ))
                 )}
               </tbody>
             </table>
