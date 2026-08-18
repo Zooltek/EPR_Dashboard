@@ -19,11 +19,13 @@ app.use(express.json());
 // Initialize Database Schema and Default Enterprise/Store
 initDatabase();
 
-// API Routes
+// API Routes (suporta tanto acesso direto /api quanto via subpath de proxy /epr/api)
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/admin', adminRouter);
+app.use('/epr/api/dashboard', dashboardRouter);
+app.use('/epr/api/admin', adminRouter);
 
-app.get('/api/health', (req, res) => {
+app.get(['/api/health', '/epr/api/health'], (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
