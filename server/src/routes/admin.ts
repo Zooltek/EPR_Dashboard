@@ -250,3 +250,44 @@ adminRouter.get('/sync-status', (req: Request, res: Response) => {
   }
 });
 
+// 10. Manual do Usuário (Markdown e PDF)
+adminRouter.get('/manual/markdown', (req: Request, res: Response) => {
+  const possiblePaths = [
+    path.join(__dirname, '../../../MANUAL_DO_USUARIO.md'),
+    path.join(process.cwd(), 'MANUAL_DO_USUARIO.md'),
+    path.join(__dirname, '../../MANUAL_DO_USUARIO.md'),
+    path.join(__dirname, '../MANUAL_DO_USUARIO.md'),
+  ];
+  let content = '';
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      content = fs.readFileSync(p, 'utf-8');
+      break;
+    }
+  }
+  if (!content) {
+    return res.status(404).json({ error: 'Manual do usuário não encontrado.' });
+  }
+  res.json({ content });
+});
+
+adminRouter.get('/manual/pdf', (req: Request, res: Response) => {
+  const possiblePaths = [
+    path.join(__dirname, '../../../Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(process.cwd(), 'Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(__dirname, '../../Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(__dirname, '../Manual_do_Usuario_Amura_Dashboard.pdf'),
+  ];
+  let pdfPath = '';
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      pdfPath = p;
+      break;
+    }
+  }
+  if (!pdfPath) {
+    return res.status(404).json({ error: 'PDF do Manual não encontrado.' });
+  }
+  res.download(pdfPath, 'Manual_do_Usuario_Amura_Dashboard.pdf');
+});
+

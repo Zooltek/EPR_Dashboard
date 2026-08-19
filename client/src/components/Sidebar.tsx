@@ -8,6 +8,7 @@ import {
   FileCheck, 
   Building2, 
   Upload,
+  HelpCircle,
   X
 } from 'lucide-react';
 
@@ -18,6 +19,7 @@ interface SidebarProps {
   setCompanyLogo: (logo: string | null) => void;
   isMobileOpen?: boolean;
   onCloseMobile?: () => void;
+  onOpenHelp?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -26,7 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   companyLogo,
   setCompanyLogo,
   isMobileOpen = false,
-  onCloseMobile
+  onCloseMobile,
+  onOpenHelp
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -183,6 +186,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Building2 size={18} />
             <span>Lojas & Configuração</span>
+          </div>
+
+          <div 
+            className="menu-item"
+            onClick={() => {
+              if (onOpenHelp) onOpenHelp();
+              if (onCloseMobile) onCloseMobile();
+            }}
+            style={{ marginTop: 8, color: '#f97316' }}
+            title="Abrir Manual do Usuário e Documentação (Atalho: F1)"
+          >
+            <HelpCircle size={18} />
+            <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span>Ajuda / Manual</span>
+              <kbd style={{ 
+                fontSize: '0.65rem', 
+                background: 'rgba(249, 115, 22, 0.2)', 
+                color: '#f97316', 
+                padding: '2px 5px', 
+                borderRadius: '4px',
+                border: '1px solid rgba(249, 115, 22, 0.4)',
+                fontWeight: 700
+              }}>F1</kbd>
+            </span>
           </div>
         </nav>
 

@@ -9,11 +9,25 @@ import { CustomersPage } from './pages/CustomersPage';
 import { StoreComparisonPage } from './pages/StoreComparisonPage';
 import { PbiFilesPage } from './pages/PbiFilesPage';
 import { EmpresasPage } from './pages/EmpresasPage';
+import { HelpModal } from './components/HelpModal';
 import type { FilterState, FilterOptions, OverviewData } from './types';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('visao-geral');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+  const [isHelpOpen, setIsHelpOpen] = useState<boolean>(false);
+
+  // Global F1 key listener for Help Manual
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setIsHelpOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Theme Mode (Dark / Light)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -135,6 +149,7 @@ export const App: React.FC = () => {
         setCompanyLogo={setCompanyLogo}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
+        onOpenHelp={() => setIsHelpOpen(true)}
       />
       
       <main className="main-content">
@@ -148,6 +163,7 @@ export const App: React.FC = () => {
           toggleTheme={toggleTheme}
           onRefreshSync={handleRefreshSync}
           onToggleMobileMenu={() => setIsMobileSidebarOpen(prev => !prev)}
+          onOpenHelp={() => setIsHelpOpen(true)}
         />
 
         {activeTab === 'visao-geral' && (
@@ -172,6 +188,11 @@ export const App: React.FC = () => {
           <EmpresasPage />
         )}
       </main>
+
+      <HelpModal 
+        isOpen={isHelpOpen} 
+        onClose={() => setIsHelpOpen(false)} 
+      />
     </div>
   );
 };
