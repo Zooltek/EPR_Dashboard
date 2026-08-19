@@ -169,3 +169,36 @@ adminRouter.post('/upload-pbi', upload.array('files', 20), async (req: Request, 
     res.status(500).json({ error: err.message || 'Falha ao processar arquivos' });
   }
 });
+
+// 6. Obter e Salvar Configurações de Sincronização (FTP / Local)
+adminRouter.get('/config-sync', (req: Request, res: Response) => {
+  try {
+    const { getSyncConfig } = require('../services/ftpSyncService');
+    const config = getSyncConfig();
+    res.json(config);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+adminRouter.post('/config-sync', (req: Request, res: Response) => {
+  try {
+    const { saveSyncConfig } = require('../services/ftpSyncService');
+    const saved = saveSyncConfig(req.body);
+    res.json({ success: true, message: 'Configurações de sincronização salvas com sucesso!', config: saved });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 7. Testar Conexão FTP ou Pasta Local
+adminRouter.post('/test-ftp', async (req: Request, res: Response) => {
+  try {
+    const { testFtpConnection } = require('../services/ftpSyncService');
+    const result = await testFtpConnection(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ success: false, message: err.message, filesFound: [] });
+  }
+});
+

@@ -31,11 +31,12 @@ app.get(['/api/health', '/epr/api/health'], (req, res) => {
 
 // Serve frontend in production (if client/dist exists)
 const clientDistCandidates = [
+  process.env.CLIENT_DIST_DIR,
   path.join(__dirname, '../../client/dist'),
   path.join(__dirname, '../client/dist'),
   path.join(process.cwd(), 'client/dist'),
   path.join(process.cwd(), 'dist/client'),
-];
+].filter(Boolean) as string[];
 const clientDist = clientDistCandidates.find(p => fs.existsSync(p));
 
 if (clientDist) {
@@ -48,9 +49,11 @@ if (clientDist) {
 }
 
 app.listen(PORT, () => {
-  console.log(`[Server] EPR Dashboard rodando em http://localhost:${PORT}`);
+  console.log(`[Server] Amura Dashboard rodando em http://localhost:${PORT}`);
 
-  const localPbiDir = process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
+  const { getSyncConfig } = require('./services/ftpSyncService');
+  const cfg = getSyncConfig();
+  const localPbiDir = cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
   
   // 1. Iniciar File Watcher para detectar novos arquivos PBI em tempo real
   startPbiDirectoryWatcher(localPbiDir);
@@ -71,8 +74,8 @@ app.listen(PORT, () => {
   }, 200);
 
   // 3. Agendador Periódico (Cron/Interval)
-  const syncIntervalMinutes = parseInt(process.env.SYNC_INTERVAL_MINUTES || '5', 10);
-  if (syncIntervalMinutes > 0) {
+  const syncIntervalMinutes = cfg.intervalo_minutos || parseInt(process.env.SYNC_INTERVAL_MINUTES || '5', 10);
+  if (cfg.auto_sync_ativo !== 0 && syncIntervalMinutes > 0) {
     const intervalMs = syncIntervalMinutes * 60 * 1000;
     console.log(`[Sync] Agendamento automático ativo a cada ${syncIntervalMinutes} minuto(s).`);
     setInterval(() => {
@@ -87,4 +90,5 @@ app.listen(PORT, () => {
     }, intervalMs);
   }
 });
+
 

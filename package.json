@@ -1,7 +1,7 @@
 {
-  "name": "epr-dashboard-desktop",
+  "name": "amura-dashboard",
   "version": "1.0.0",
-  "description": "Dashboard Gerencial Multilojas EPR - Aplicativo Desktop",
+  "description": "Amura Dashboard - Gestão e Inteligência Multilojas",
   "main": "desktop/main.js",
   "scripts": {
     "build:client": "cd client && npm run build",
@@ -9,19 +9,20 @@
     "build:all": "npm run build:client && npm run build:server",
     "desktop:start": "electron .",
     "desktop:dev": "npm run build:all && electron .",
-    "desktop:dist": "npm run build:all && electron-builder --win nsis"
+    "desktop:dist": "npm run build:all && node build_wrapper.js && electron-builder --win nsis"
   },
   "keywords": [
-    "epr",
+    "amura",
     "dashboard",
     "varejo",
+    "multilojas",
     "electron"
   ],
   "author": "Zooltek",
   "license": "ISC",
   "build": {
-    "appId": "com.zooltek.eprdashboard",
-    "productName": "EPR Dashboard",
+    "appId": "com.zooltek.amuradashboard",
+    "productName": "Amura Dashboard",
     "copyright": "Copyright © 2026 Zooltek",
     "directories": {
       "output": "dist-electron"
@@ -30,7 +31,6 @@
       "desktop/**/*",
       "server/dist/**/*",
       "server/package.json",
-      "server/node_modules/**/*",
       "client/dist/**/*",
       "PBI/**/*",
       "Logo Amura.png"
@@ -55,11 +55,29 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "EPR Dashboard"
+      "shortcutName": "Amura Dashboard"
     }
   },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "basic-ftp": "^5.0.5",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fast-xml-parser": "^4.5.3",
+    "jszip": "^3.10.1",
+    "multer": "^2.2.0"
+  },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^22.13.1",
     "electron": "^34.2.0",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.3"
   }
 }

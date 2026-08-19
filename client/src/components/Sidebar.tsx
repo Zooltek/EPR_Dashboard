@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               <div className="logo-text" style={{ flex: 1 }}>
                 <h1 style={{ fontSize: '0.95rem', fontWeight: 800, margin: 0, lineHeight: 1.2, color: 'var(--text-main)' }}>
-                  Dashboard Gerencial
+                  Amura Dashboard
                 </h1>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: 3 }}>
                   <Upload size={10} /> {companyLogo ? 'Alterar Logo' : 'Inserir Logo'}

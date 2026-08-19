@@ -2,9 +2,135 @@ import fs from 'fs';
 import path from 'path';
 import * as ftp from 'basic-ftp';
 import dotenv from 'dotenv';
+import { db } from '../db/database';
 import { importPbiZip, ImportResult } from './pbiImporter';
 
 dotenv.config();
+
+export const FTP_PRESETS = {
+  VIXHOST: {
+    name: 'VixHost (Consuldata)',
+    host: 'ftp.consuldatasistemas.com.br',
+    port: 21,
+    user: 'consuldata',
+    password: '8F1h#7ok',
+    baseDir: 'cliente',
+  },
+  UOLHOST: {
+    name: 'UOLHost (Plenus)',
+    host: 'ftp.sistemaplenus.com.br',
+    port: 21,
+    user: 'sistemaplenus',
+    password: 'fTp#17902510',
+    baseDir: 'cliente',
+  },
+};
+
+export interface SyncConfig {
+  id?: number;
+  modo_sincronizacao: 'FTP' | 'LOCAL' | 'AMBOS';
+  provedor_ftp: 'VIXHOST' | 'UOLHOST' | 'CUSTOM';
+  pasta_cliente_ftp: string;
+  ftp_host?: string;
+  ftp_port?: number;
+  ftp_user?: string;
+  ftp_password?: string;
+  ftp_dir?: string;
+  pasta_local_pbi?: string;
+  intervalo_minutos?: number;
+  auto_sync_ativo?: number;
+  updated_at?: string;
+}
+
+export function getSyncConfig(): SyncConfig {
+  try {
+    const row = db.prepare(`SELECT * FROM configuracao_sync WHERE id = 1`).get() as any;
+    if (row) {
+      return {
+        ...row,
+        auto_sync_ativo: Number(row.auto_sync_ativo),
+        intervalo_minutos: Number(row.intervalo_minutos),
+        ftp_port: Number(row.ftp_port || 21),
+      };
+    }
+  } catch (err) {
+    console.error('[ConfigSync] Erro ao carregar do banco:', err);
+  }
+
+  return {
+    modo_sincronizacao: 'FTP',
+    provedor_ftp: 'VIXHOST',
+    pasta_cliente_ftp: 'fabricio',
+    ftp_host: 'ftp.consuldatasistemas.com.br',
+    ftp_port: 21,
+    ftp_user: 'consuldata',
+    ftp_password: '8F1h#7ok',
+    ftp_dir: 'cliente/fabricio',
+    pasta_local_pbi: '',
+    intervalo_minutos: 5,
+    auto_sync_ativo: 1,
+  };
+}
+
+export function saveSyncConfig(cfg: Partial<SyncConfig>): SyncConfig {
+  const current = getSyncConfig();
+  const updated: SyncConfig = { ...current, ...cfg };
+
+  // Calculate ftp_dir automatically if using standard presets
+  if (updated.provedor_ftp === 'VIXHOST') {
+    updated.ftp_host = FTP_PRESETS.VIXHOST.host;
+    updated.ftp_port = FTP_PRESETS.VIXHOST.port;
+    updated.ftp_user = FTP_PRESETS.VIXHOST.user;
+    updated.ftp_password = FTP_PRESETS.VIXHOST.password;
+    updated.ftp_dir = `cliente/${(updated.pasta_cliente_ftp || '').trim()}`;
+  } else if (updated.provedor_ftp === 'UOLHOST') {
+    updated.ftp_host = FTP_PRESETS.UOLHOST.host;
+    updated.ftp_port = FTP_PRESETS.UOLHOST.port;
+    updated.ftp_user = FTP_PRESETS.UOLHOST.user;
+    updated.ftp_password = FTP_PRESETS.UOLHOST.password;
+    updated.ftp_dir = `cliente/${(updated.pasta_cliente_ftp || '').trim()}`;
+  }
+
+  db.prepare(`
+    INSERT INTO configuracao_sync (
+      id, modo_sincronizacao, provedor_ftp, pasta_cliente_ftp,
+      ftp_host, ftp_port, ftp_user, ftp_password, ftp_dir,
+      pasta_local_pbi, intervalo_minutos, auto_sync_ativo, updated_at
+    ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(id) DO UPDATE SET
+      modo_sincronizacao = excluded.modo_sincronizacao,
+      provedor_ftp = excluded.provedor_ftp,
+      pasta_cliente_ftp = excluded.pasta_cliente_ftp,
+      ftp_host = excluded.ftp_host,
+      ftp_port = excluded.ftp_port,
+      ftp_user = excluded.ftp_user,
+      ftp_password = excluded.ftp_password,
+      ftp_dir = excluded.ftp_dir,
+      pasta_local_pbi = excluded.pasta_local_pbi,
+      intervalo_minutos = excluded.intervalo_minutos,
+      auto_sync_ativo = excluded.auto_sync_ativo,
+      updated_at = CURRENT_TIMESTAMP
+  `).run(
+    updated.modo_sincronizacao,
+    updated.provedor_ftp,
+    updated.pasta_cliente_ftp || '',
+    updated.ftp_host || '',
+    updated.ftp_port || 21,
+    updated.ftp_user || '',
+    updated.ftp_password || '',
+    updated.ftp_dir || '',
+    updated.pasta_local_pbi || '',
+    updated.intervalo_minutos || 5,
+    updated.auto_sync_ativo !== undefined ? updated.auto_sync_ativo : 1
+  );
+
+  // Restart watcher if local path changed
+  if (updated.pasta_local_pbi) {
+    startPbiDirectoryWatcher(updated.pasta_local_pbi);
+  }
+
+  return getSyncConfig();
+}
 
 export interface FtpSyncOptions {
   host?: string;
@@ -12,6 +138,8 @@ export interface FtpSyncOptions {
   user?: string;
   password?: string;
   remoteDir?: string;
+  provider?: 'VIXHOST' | 'UOLHOST' | 'CUSTOM';
+  clientFolder?: string;
 }
 
 export interface SyncSummary {
@@ -27,14 +155,15 @@ export interface SyncSummary {
 }
 
 /**
- * Processa todos os arquivos .zip de um diretório local (ex: C:\Consuldata\PBI ou ./PBI)
+ * Processa todos os arquivos .zip de um diretório local
  */
 export async function syncLocalPbiFolder(targetDir?: string): Promise<{
   dirScanned: string;
   filesFound: string[];
   importResults: ImportResult[];
 }> {
-  const pbiDir = targetDir || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
+  const cfg = getSyncConfig();
+  const pbiDir = targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
   const resolvedPath = path.isAbsolute(pbiDir) ? pbiDir : path.resolve(process.cwd(), pbiDir);
 
   const filesFound: string[] = [];
@@ -70,6 +199,103 @@ export async function syncLocalPbiFolder(targetDir?: string): Promise<{
 }
 
 /**
+ * Testa a conexão FTP com os parâmetros informados ou salvos
+ */
+export async function testFtpConnection(options?: FtpSyncOptions): Promise<{
+  success: boolean;
+  message: string;
+  filesFound: string[];
+  currentDir?: string;
+}> {
+  const cfg = getSyncConfig();
+  const provider = options?.provider || cfg.provedor_ftp || 'VIXHOST';
+  const clientFolder = (options?.clientFolder !== undefined ? options.clientFolder : cfg.pasta_cliente_ftp || '').trim();
+
+  let host = options?.host || cfg.ftp_host;
+  let port = options?.port || cfg.ftp_port || 21;
+  let user = options?.user || cfg.ftp_user;
+  let password = options?.password || cfg.ftp_password;
+  let remoteDir = options?.remoteDir || cfg.ftp_dir || `cliente/${clientFolder}`;
+
+  if (provider === 'VIXHOST') {
+    host = FTP_PRESETS.VIXHOST.host;
+    port = FTP_PRESETS.VIXHOST.port;
+    user = FTP_PRESETS.VIXHOST.user;
+    password = FTP_PRESETS.VIXHOST.password;
+    remoteDir = `cliente/${clientFolder}`;
+  } else if (provider === 'UOLHOST') {
+    host = FTP_PRESETS.UOLHOST.host;
+    port = FTP_PRESETS.UOLHOST.port;
+    user = FTP_PRESETS.UOLHOST.user;
+    password = FTP_PRESETS.UOLHOST.password;
+    remoteDir = `cliente/${clientFolder}`;
+  }
+
+  if (!host || !user || !password) {
+    return {
+      success: false,
+      message: 'Host, usuário ou senha de FTP não informados.',
+      filesFound: [],
+    };
+  }
+
+  const client = new ftp.Client();
+  client.ftp.verbose = false;
+
+  try {
+    await client.access({
+      host,
+      port: Number(port),
+      user,
+      password,
+      secure: false,
+    });
+
+    // Se UOLHost, sair da pasta atual inicial e ir para raiz/cliente
+    if (provider === 'UOLHOST') {
+      try { await client.cd('..'); } catch {}
+      try { await client.cd('/'); } catch {}
+    }
+
+    // Tentar acessar a pasta do cliente
+    const candidates = [
+      remoteDir,
+      `cliente/${clientFolder}`,
+      `clientes/${clientFolder}`,
+      clientFolder,
+    ];
+
+    let accessedDir = '';
+    for (const dir of candidates) {
+      if (!dir) continue;
+      try {
+        await client.cd(dir);
+        accessedDir = dir;
+        break;
+      } catch {}
+    }
+
+    const list = await client.list();
+    const zipEntries = list.filter(item => item.name.toLowerCase().endsWith('.zip')).map(item => item.name);
+
+    client.close();
+    return {
+      success: true,
+      message: `Conectado com sucesso em ${host}! Pasta acessada: '${accessedDir || '/'}' com ${zipEntries.length} arquivo(s) .zip encontrados.`,
+      filesFound: zipEntries,
+      currentDir: accessedDir,
+    };
+  } catch (err: any) {
+    try { client.close(); } catch {}
+    return {
+      success: false,
+      message: `Falha na conexão FTP (${host}): ${err.message}`,
+      filesFound: [],
+    };
+  }
+}
+
+/**
  * Conecta ao FTP e baixa novos arquivos .zip para a pasta downloads
  */
 export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
@@ -79,20 +305,40 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
   downloadedFiles: string[];
   importResults: ImportResult[];
 }> {
-  const host = options?.host || process.env.FTP_HOST;
-  const port = options?.port || parseInt(process.env.FTP_PORT || '21', 10);
-  const user = options?.user || process.env.FTP_USER;
-  const password = options?.password || process.env.FTP_PASSWORD;
-  const rawRemoteDir = options?.remoteDir || process.env.FTP_DIR || 'clientes/fabricio';
+  const cfg = getSyncConfig();
+  const provider = options?.provider || cfg.provedor_ftp || 'VIXHOST';
+  const clientFolder = (options?.clientFolder !== undefined ? options.clientFolder : cfg.pasta_cliente_ftp || '').trim();
 
-  const normalizedRemoteDir = rawRemoteDir.replace(/\\/g, '/').replace(/^\/+/, '');
+  let host = options?.host || cfg.ftp_host;
+  let port = options?.port || cfg.ftp_port || 21;
+  let user = options?.user || cfg.ftp_user;
+  let password = options?.password || cfg.ftp_password;
+  let remoteDir = options?.remoteDir || cfg.ftp_dir || `cliente/${clientFolder}`;
+
+  if (provider === 'VIXHOST') {
+    host = FTP_PRESETS.VIXHOST.host;
+    port = FTP_PRESETS.VIXHOST.port;
+    user = FTP_PRESETS.VIXHOST.user;
+    password = FTP_PRESETS.VIXHOST.password;
+    remoteDir = `cliente/${clientFolder}`;
+  } else if (provider === 'UOLHOST') {
+    host = FTP_PRESETS.UOLHOST.host;
+    port = FTP_PRESETS.UOLHOST.port;
+    user = FTP_PRESETS.UOLHOST.user;
+    password = FTP_PRESETS.UOLHOST.password;
+    remoteDir = `cliente/${clientFolder}`;
+  }
 
   const remoteFilesFound: string[] = [];
   const downloadedFiles: string[] = [];
   const importResults: ImportResult[] = [];
 
   // Local directory to store downloaded PBI zips
-  const downloadsDir = path.join(__dirname, '../../downloads');
+  const defaultDownloads = path.join(__dirname, '../../downloads');
+  const downloadsDir = process.env.EPR_DATA_DIR
+    ? path.join(process.env.EPR_DATA_DIR, '../downloads')
+    : defaultDownloads;
+
   if (!fs.existsSync(downloadsDir)) {
     fs.mkdirSync(downloadsDir, { recursive: true });
   }
@@ -100,7 +346,7 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
   if (!host || !user || !password) {
     return {
       ftpConnected: false,
-      ftpMessage: 'Credenciais de FTP não configuradas. Operando apenas com sincronização local.',
+      ftpMessage: 'Credenciais de FTP não configuradas.',
       remoteFilesFound,
       downloadedFiles,
       importResults,
@@ -111,17 +357,41 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
   client.ftp.verbose = false;
 
   try {
-    console.log(`[FTP] Conectando ao servidor ${host}:${port} com usuário ${user}...`);
+    console.log(`[FTP] Conectando a ${host}:${port} (${provider})...`);
     await client.access({
       host,
-      port,
+      port: Number(port),
       user,
       password,
       secure: false,
     });
 
-    console.log(`[FTP] Conexão estabelecida com sucesso! Acessando diretório: ${normalizedRemoteDir}`);
-    await client.cd(normalizedRemoteDir);
+    if (provider === 'UOLHOST') {
+      try { await client.cd('..'); } catch {}
+      try { await client.cd('/'); } catch {}
+    }
+
+    const candidates = [
+      remoteDir,
+      `cliente/${clientFolder}`,
+      `clientes/${clientFolder}`,
+      clientFolder,
+    ];
+
+    let navigated = false;
+    for (const dir of candidates) {
+      if (!dir) continue;
+      try {
+        await client.cd(dir);
+        navigated = true;
+        console.log(`[FTP] Diretório acessado: ${dir}`);
+        break;
+      } catch {}
+    }
+
+    if (!navigated && clientFolder) {
+      console.warn(`[FTP] Não foi possível navegar para nenhuma pasta de cliente esperada (${candidates.join(', ')})`);
+    }
 
     const list = await client.list();
     const zipEntries = list.filter(item => item.name.toLowerCase().endsWith('.zip'));
@@ -162,13 +432,13 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
 
     return {
       ftpConnected: true,
-      ftpMessage: `FTP conectado com sucesso! ${zipEntries.length} arquivo(s) ZIP encontrado(s) no FTP.`,
+      ftpMessage: `FTP conectado com sucesso! ${zipEntries.length} arquivo(s) ZIP no FTP (${provider}).`,
       remoteFilesFound,
       downloadedFiles,
       importResults,
     };
   } catch (err: any) {
-    console.error(`[FTP] Erro na conexão FTP:`, err.message);
+    console.error(`[FTP] Erro na conexão FTP (${host}):`, err.message);
     try { client.close(); } catch {}
     return {
       ftpConnected: false,
@@ -181,18 +451,45 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
 }
 
 /**
- * Orquestrador completo: executa sincronização de pasta local e/ou FTP conforme configuração
+ * Orquestrador completo: executa sincronização de pasta local e/ou FTP conforme configuração do sistema
  */
 export async function runFullSync(options?: { localDir?: string; ftp?: FtpSyncOptions }): Promise<SyncSummary> {
-  const localRes = await syncLocalPbiFolder(options?.localDir);
-  const ftpRes = await syncPbiFromFtp(options?.ftp);
+  const cfg = getSyncConfig();
+  const mode = cfg.modo_sincronizacao || 'FTP';
+
+  let localRes: { dirScanned: string; filesFound: string[]; importResults: ImportResult[] } = {
+    dirScanned: '',
+    filesFound: [],
+    importResults: [],
+  };
+
+  let ftpRes: {
+    ftpConnected: boolean;
+    ftpMessage: string;
+    remoteFilesFound: string[];
+    downloadedFiles: string[];
+    importResults: ImportResult[];
+  } = {
+    ftpConnected: false,
+    ftpMessage: 'FTP não executado para o modo atual.',
+    remoteFilesFound: [],
+    downloadedFiles: [],
+    importResults: [],
+  };
+
+  if (mode === 'LOCAL' || mode === 'AMBOS') {
+    localRes = await syncLocalPbiFolder(options?.localDir);
+  }
+
+  if (mode === 'FTP' || mode === 'AMBOS') {
+    ftpRes = await syncPbiFromFtp(options?.ftp);
+  }
 
   const combinedResults = [...localRes.importResults, ...ftpRes.importResults];
-  const totalFiles = localRes.filesFound.length + ftpRes.downloadedFiles.length;
 
   return {
     success: true,
-    message: `Sincronização concluída. ${localRes.filesFound.length} arquivo(s) locais e ${ftpRes.downloadedFiles.length} arquivo(s) FTP processados.`,
+    message: `Sincronização concluída (${mode}). ${localRes.filesFound.length} arquivo(s) locais e ${ftpRes.downloadedFiles.length} baixados do FTP.`,
     localDirScanned: localRes.dirScanned,
     localFilesFound: localRes.filesFound,
     ftpConnected: ftpRes.ftpConnected,
@@ -209,13 +506,14 @@ export async function syncPbiFolder(pbiDir: string): Promise<ImportResult[]> {
 }
 
 /**
- * File Watcher: Monitora a pasta local em tempo real para processar novos arquivos ZIP assim que o ERP salvar
+ * File Watcher: Monitora a pasta local em tempo real
  */
 let watcherInstance: fs.FSWatcher | null = null;
 const debounceTimers = new Map<string, NodeJS.Timeout>();
 
 export function startPbiDirectoryWatcher(targetDir?: string) {
-  const pbiDir = targetDir || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
+  const cfg = getSyncConfig();
+  const pbiDir = targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
   const resolvedPath = path.isAbsolute(pbiDir) ? pbiDir : path.resolve(process.cwd(), pbiDir);
 
   if (!fs.existsSync(resolvedPath)) {
@@ -235,7 +533,6 @@ export function startPbiDirectoryWatcher(targetDir?: string) {
 
       const fullPath = path.join(resolvedPath, filename);
 
-      // Debounce de 1.5s para garantir que o ERP terminou de gravar o arquivo no disco
       if (debounceTimers.has(filename)) {
         clearTimeout(debounceTimers.get(filename)!);
       }
@@ -260,4 +557,5 @@ export function startPbiDirectoryWatcher(targetDir?: string) {
     console.error(`[PBI Watcher] Erro ao iniciar watcher na pasta ${resolvedPath}:`, err.message);
   }
 }
+
 

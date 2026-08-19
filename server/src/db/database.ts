@@ -59,6 +59,23 @@ export function initDatabase() {
       FOREIGN KEY (empresa_id) REFERENCES empresa(id) ON DELETE SET NULL
     );
 
+    -- Configuração de Sincronização (FTP / Local)
+    CREATE TABLE IF NOT EXISTS configuracao_sync (
+      id INTEGER PRIMARY KEY,
+      modo_sincronizacao TEXT NOT NULL DEFAULT 'FTP', -- 'FTP', 'LOCAL', 'AMBOS'
+      provedor_ftp TEXT NOT NULL DEFAULT 'VIXHOST', -- 'VIXHOST', 'UOLHOST', 'CUSTOM'
+      pasta_cliente_ftp TEXT DEFAULT 'fabricio',
+      ftp_host TEXT DEFAULT 'ftp.consuldatasistemas.com.br',
+      ftp_port INTEGER DEFAULT 21,
+      ftp_user TEXT DEFAULT 'consuldata',
+      ftp_password TEXT DEFAULT '8F1h#7ok',
+      ftp_dir TEXT DEFAULT 'clientes/fabricio',
+      pasta_local_pbi TEXT DEFAULT '',
+      intervalo_minutos INTEGER DEFAULT 5,
+      auto_sync_ativo INTEGER DEFAULT 1,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Tabelas Auxiliares de Produto
     CREATE TABLE IF NOT EXISTS marca (
       id INTEGER PRIMARY KEY,
@@ -235,5 +252,15 @@ export function initDatabase() {
       VALUES (?, 2, '39310768000105', 'Loja 02 - Cachoeiro Centro', 'ATIVO')
     `);
     insertLoja.run(empresaId);
+  }
+
+  // Ensure Default Sync Configuration exists
+  const syncStmt = db.prepare(`SELECT count(*) as count FROM configuracao_sync`);
+  const syncRow = syncStmt.get() as { count: number };
+  if (syncRow.count === 0) {
+    db.prepare(`
+      INSERT INTO configuracao_sync (id, modo_sincronizacao, provedor_ftp, pasta_cliente_ftp, ftp_host, ftp_port, ftp_user, ftp_password, ftp_dir, pasta_local_pbi, intervalo_minutos, auto_sync_ativo)
+      VALUES (1, 'FTP', 'VIXHOST', 'fabricio', 'ftp.consuldatasistemas.com.br', 21, 'consuldata', '8F1h#7ok', 'cliente/fabricio', '', 5, 1)
+    `).run();
   }
 }
