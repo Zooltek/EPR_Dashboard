@@ -25,6 +25,7 @@
     "productName": "Amura Dashboard",
     "copyright": "Copyright © 2026 Fabricio",
     "npmRebuild": false,
+    "asar": false,
     "directories": {
       "output": "dist-electron"
     },

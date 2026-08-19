@@ -103,6 +103,10 @@ function startBackendServer() {
       log(`[Backend stderr] ${msg}`);
     });
 
+    serverProcess.on('error', (err) => {
+      log(`[Backend ERRO no spawn] ${err.stack || err.message}`);
+    });
+
     serverProcess.on('exit', (code) => {
       log(`[Backend] Processo finalizado com código: ${code}`);
     });
