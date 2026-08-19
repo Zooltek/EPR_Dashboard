@@ -4,9 +4,12 @@ node_modules/
 
 # Environment Variables & Secrets
 .env
+.env.secrets
+.env*.secrets
 .env.local
 .env.*.local
 server/.env
+server/.env.secrets
 *.key
 *.pub
 *.pem

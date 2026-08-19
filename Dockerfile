@@ -1,5 +1,5 @@
 # ==========================================
-# Multi-Stage Dockerfile — EPR Dashboard
+# Multi-Stage Dockerfile — Amura Dashboard (Hardened)
 # ==========================================
 
 # 1. Stage: Build Frontend (Vite + React)
@@ -19,32 +19,35 @@ RUN npm ci
 COPY server/ ./
 RUN npm run build
 
-# 3. Stage: Production Runner Image
+# 3. Stage: Hardened Production Runner Image
 FROM node:22-alpine AS runner
 WORKDIR /app
 
-# Configurações de Fuso Horário Brasil
+# Configurações de Fuso Horário e Ambiente
 RUN apk add --no-cache tzdata
 ENV TZ=America/Sao_Paulo
 ENV NODE_ENV=production
 ENV PORT=3001
 
-# Instalação apenas das dependências de produção do backend
+# Instalação das dependências de produção do backend
 WORKDIR /app/server
 COPY server/package*.json ./
 RUN apk add --no-cache python3 make g++ gcc && \
     npm ci --omit=dev && \
     apk del python3 make g++ gcc
 
-# Copia o código compilado do backend
+# Copia código compilado do backend
 COPY --from=server-builder /app/server/dist ./dist
 
-# Copia o build estático do frontend
+# Copia build estático do frontend
 COPY --from=client-builder /app/client/dist /app/client/dist
 
-# Cria diretórios persistentes para o SQLite e arquivos FTP
-COPY PBI /app/PBI
-RUN mkdir -p /app/server/data /app/server/downloads
+# Cria diretórios de dados com permissões do usuário não-root 'node'
+RUN mkdir -p /app/PBI /app/server/data /app/server/downloads && \
+    chown -R node:node /app
+
+# Execução com usuário sem privilégios administrativos
+USER node
 
 EXPOSE 3001
 

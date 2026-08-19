@@ -68,8 +68,8 @@ export function initDatabase() {
       ftp_host TEXT DEFAULT 'ftp.consuldatasistemas.com.br',
       ftp_port INTEGER DEFAULT 21,
       ftp_user TEXT DEFAULT 'consuldata',
-      ftp_password TEXT DEFAULT '8F1h#7ok',
-      ftp_dir TEXT DEFAULT 'clientes/fabricio',
+      ftp_password TEXT DEFAULT '',
+      ftp_dir TEXT DEFAULT 'cliente/fabricio',
       pasta_local_pbi TEXT DEFAULT '',
       intervalo_minutos INTEGER DEFAULT 5,
       auto_sync_ativo INTEGER DEFAULT 1,
@@ -241,7 +241,7 @@ export function initDatabase() {
   if (syncRow.count === 0) {
     db.prepare(`
       INSERT INTO configuracao_sync (id, modo_sincronizacao, provedor_ftp, pasta_cliente_ftp, ftp_host, ftp_port, ftp_user, ftp_password, ftp_dir, pasta_local_pbi, intervalo_minutos, auto_sync_ativo)
-      VALUES (1, 'FTP', 'VIXHOST', 'fabricio', 'ftp.consuldatasistemas.com.br', 21, 'consuldata', '8F1h#7ok', 'cliente/fabricio', '', 5, 1)
+      VALUES (1, 'FTP', 'VIXHOST', 'fabricio', 'ftp.consuldatasistemas.com.br', 21, 'consuldata', '', 'cliente/fabricio', '', 5, 1)
     `).run();
   }
 

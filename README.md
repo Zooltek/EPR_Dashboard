@@ -1,6 +1,6 @@
-# 📊 EPR Dashboard — Inteligência de Negócios & BI Multilojas
+# 📊 Amura Dashboard — Inteligência de Negócios & BI Multilojas
 
-Sistema completo de inteligência de negócios (Business Intelligence) e Dashboard Gerencial Web integrado ao ERP (Consuldata e similares). O sistema realiza a captura contínua, processamento inteligente e consolidação visual de vendas, metas, estoque, vendedores e clientes, operando de forma **100% local (offline)** ou em **nuvem (VPS com Docker)**.
+Sistema completo de inteligência de negócios (Business Intelligence) e Dashboard Gerencial Web integrado ao ERP. O sistema realiza a captura contínua, processamento inteligente e consolidação visual de vendas, metas, estoque, vendedores e clientes, operando de forma **100% local (offline)** ou em **nuvem (VPS com Docker)**.
 
 ---
 
@@ -284,65 +284,73 @@ services:
 
 ---
 
-## 6. Variáveis de Ambiente (.env)
+## 6. Variáveis de Ambiente (.env & .env.secrets)
+
+Copie o arquivo `.env.example` para `.env` ou crie `.env.secrets` para armazenar credenciais sensíveis:
 
 | Variável | Tipo | Padrão | Descrição |
 | :--- | :--- | :--- | :--- |
 | `PORT` | Número | `3001` | Porta HTTP em que o servidor irá responder |
-| `NODE_ENV` | Texto | `development` | Ambiente (`development` ou `production`) |
+| `NODE_ENV` | Texto | `production` | Ambiente (`development` ou `production`) |
 | `LOCAL_PBI_DIR` | Caminho | `./PBI` | Pasta local monitorada para busca de arquivos `.zip` |
-| `SYNC_INTERVAL_MINUTES` | Número | `5` | Intervalo em minutos da varredura agendada |
-| `FTP_HOST` | Host | - | Host do servidor FTP (ex: `ftp.consuldatasistemas.com.br`) |
-| `FTP_PORT` | Número | `21` | Porta do servidor FTP |
-| `FTP_USER` | Texto | - | Usuário de autenticação do FTP |
-| `FTP_PASSWORD` | Texto | - | Senha do FTP |
-| `FTP_DIR` | Caminho | - | Diretório remoto do cliente no FTP |
+| `FTP_VIXHOST_HOST` | Host | `ftp.consuldatasistemas.com.br` | Host do provedor FTP VixHost |
+| `FTP_VIXHOST_PORT` | Número | `21` | Porta do servidor VixHost |
+| `FTP_VIXHOST_USER` | Texto | `consuldata` | Usuário do provedor VixHost |
+| `FTP_VIXHOST_PASSWORD`| Texto | - | Senha do FTP VixHost (guardar em `.env.secrets`) |
+| `FTP_UOLHOST_HOST` | Host | `ftp.sistemaplenus.com.br` | Host do provedor FTP UOLHost |
+| `FTP_UOLHOST_PORT` | Número | `21` | Porta do servidor UOLHost |
+| `FTP_UOLHOST_USER` | Texto | `sistemaplenus` | Usuário do provedor UOLHost |
+| `FTP_UOLHOST_PASSWORD`| Texto | - | Senha do FTP UOLHost (guardar em `.env.secrets`) |
 
 ---
 
-## 7. Estrutura do Banco de Dados (SQLite)
+## 7. 🔒 Segurança & Boas Práticas
 
-O banco é criado automaticamente em `server/data/dashboard.sqlite` com as seguintes tabelas principais:
+### Gerenciamento de Credenciais
+* **Sem Credenciais no Código**: Nenhuma senha ou segredo é versionado no repositório Git.
+* **Arquivo `.env.secrets`**: Utilize `.env.secrets` para armazenar senhas em produção. Este arquivo é automaticamente ignorado pelo `.gitignore` e carregado com prioridade máxima pelo backend.
+* **Rotação de Senhas**: Para alterar senhas de FTP, basta atualizar a variável de ambiente correspondente ou reconfigurar através da interface em *Lojas & Configurações*.
 
-* `empresa` — Cadastro de empresas/grupos econômicos.
-* `loja` — Cadastro de lojas/filiais com seus respectivos CNPJs e IDs ERP.
-* `venda_cab` — Cabeçalho das vendas (data, hora, valores, descontos, formas de pagamento, status).
-* `venda_item` — Itens vendidos/trocados (produto, cor, tamanho, quantidade, valor bruto/líquido).
-* `produto` — Catálogo de produtos referenciando marcas, grupos, famílias e coleções.
-* `estoque` — Posição de estoque por loja, referência, cor e grade/tamanho.
-* `vendedor` — Cadastro de vendedores com apelido e dados de equipe.
-* `cliente` — Base de clientes cadastrados no ERP.
-* `pbi_arquivo` — Histórico de sincronização de cada arquivo ZIP, tamanho, registros e status.
-
----
-
-## 8. Backup, Manutenção e Troubleshooting
-
-### Como Fazer Backup do Banco de Dados
-Basta copiar o arquivo `dashboard.sqlite` localizado em `server/data/`:
+### Auditoria de Dependências
+Para verificar a segurança de dependências em produção:
 ```bash
-# Exemplo de backup manual com data
-cp server/data/dashboard.sqlite server/data/dashboard_backup_$(date +%Y%m%d).sqlite
+# Executa auditoria estrita em dependências de produção
+npm audit --omit=dev
 ```
 
-### Como Reprocessar Arquivos PBI
-Se precisar reprocessar dados:
-1. Pelo painel web: Acesse a aba **Configurações / Logs de Arquivos** e clique em **Sincronizar**.
-2. Diretamente no banco:
-   ```sql
-   -- Marcar arquivo para ser reimportado na próxima sincronização:
-   UPDATE pbi_arquivo SET status = 'PENDENTE' WHERE nome_arquivo = 'PBI_...zip';
+### Execução em Container Hardened
+* O container Docker roda sob o usuário sem privilégios administrativos `USER node`.
+* Acesso restrito aos diretórios `/app/server/data` e `/app/server/downloads`.
+
+---
+
+## 8. 🧪 Testes Automatizados
+
+O backend possui suíte completa de testes unitários e de integração utilizando **Vitest**:
+```bash
+# Executar todos os testes automatizados
+npm --prefix server test
+```
+* Cobertura de validação de nomenclatura e integridade de ZIPs PBI.
+* Teste de resiliência a arquivos corrompidos ou maliciosos (Path Traversal).
+* Teste de configurações e provedores FTP dinâmicos.
+
+---
+
+## 9. Backup, Manutenção e Restauração
+
+### Como Fazer Backup do Banco de Dados
+Existem 3 formas simples de realizar cópias de segurança:
+1. **Via Painel Web**: Acesse *Lojas & Configurações* e clique no botão **Fazer Backup dos Dados** para baixar o `.sqlite` completo.
+2. **Via Aplicativo Desktop**: Acesse o menu superior *Arquivo > Fazer Backup dos Dados (.sqlite)*.
+3. **Via Linha de Comando / Docker**:
+   ```bash
+   # Cópia segura do SQLite com checkpoint WAL sincronizado
+   docker exec epr_dashboard_app node -e "const Database = require('better-sqlite3'); const db = new Database('/app/server/data/dashboard.sqlite'); db.pragma('wal_checkpoint(TRUNCATE)');"
+   cp data/dashboard.sqlite data/backup_$(date +%Y%m%d).sqlite
    ```
-
-### Problemas Comuns:
-
-* **Porta 3001 já em uso:**
-  * Altere `PORT=3002` no arquivo `.env`.
-* **Novos arquivos não aparecem:**
-  * Verifique se o nome do arquivo segue o padrão oficial: `PBI_<14_DIGITOS_CNPJ>_<AAAAMMDD>_<HHMMSS>.zip`.
-  * Verifique o log do servidor: `[PBI Local]` ou `[PBI Watcher]`.
 
 ---
 
 ## 📄 Licença
-Proprietário / **Zooltek**. Todos os direitos reservados.
+Proprietário / **Fabricio**. Todos os direitos reservados.

@@ -39,12 +39,24 @@ export interface ImportResult {
 }
 
 export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
-  const filename = path.basename(zipFilePath);
+  // Sanitização estrita contra Path Traversal
+  const normalizedPath = path.resolve(zipFilePath);
+  const filename = path.basename(normalizedPath);
+
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    return {
+      success: false,
+      filename,
+      status: 'IGNORADO',
+      message: 'Nome de arquivo inválido ou tentativa de travessia de diretório.',
+    };
+  }
+
   const parsed = parseFilename(filename);
 
   let fileSize = 0;
   try {
-    const stats = fs.statSync(zipFilePath);
+    const stats = fs.statSync(normalizedPath);
     fileSize = stats.size;
   } catch (err) {
     // File read error

@@ -7,24 +7,28 @@ import { importPbiZip, ImportResult } from './pbiImporter';
 
 dotenv.config();
 
-export const FTP_PRESETS = {
-  VIXHOST: {
-    name: 'VixHost (Consuldata)',
-    host: 'ftp.consuldatasistemas.com.br',
-    port: 21,
-    user: 'consuldata',
-    password: '8F1h#7ok',
-    baseDir: 'cliente',
-  },
-  UOLHOST: {
-    name: 'UOLHost (Plenus)',
-    host: 'ftp.sistemaplenus.com.br',
-    port: 21,
-    user: 'sistemaplenus',
-    password: 'fTp#17902510',
-    baseDir: 'cliente',
-  },
-};
+export function getFtpPresets() {
+  return {
+    VIXHOST: {
+      name: 'VixHost',
+      host: process.env.FTP_VIXHOST_HOST || process.env.FTP_HOST || 'ftp.consuldatasistemas.com.br',
+      port: Number(process.env.FTP_VIXHOST_PORT || process.env.FTP_PORT || 21),
+      user: process.env.FTP_VIXHOST_USER || process.env.FTP_USER || 'consuldata',
+      password: process.env.FTP_VIXHOST_PASSWORD || process.env.FTP_PASSWORD || '',
+      baseDir: 'cliente',
+    },
+    UOLHOST: {
+      name: 'UOLHost',
+      host: process.env.FTP_UOLHOST_HOST || 'ftp.sistemaplenus.com.br',
+      port: Number(process.env.FTP_UOLHOST_PORT || 21),
+      user: process.env.FTP_UOLHOST_USER || 'sistemaplenus',
+      password: process.env.FTP_UOLHOST_PASSWORD || '',
+      baseDir: 'cliente',
+    },
+  };
+}
+
+export const FTP_PRESETS = getFtpPresets();
 
 export interface SyncConfig {
   id?: number;
@@ -43,11 +47,15 @@ export interface SyncConfig {
 }
 
 export function getSyncConfig(): SyncConfig {
+  const presets = getFtpPresets();
   try {
     const row = db.prepare(`SELECT * FROM configuracao_sync WHERE id = 1`).get() as any;
     if (row) {
+      const provider = (row.provedor_ftp || 'VIXHOST') as 'VIXHOST' | 'UOLHOST';
+      const presetPass = presets[provider]?.password || '';
       return {
         ...row,
+        ftp_password: row.ftp_password || presetPass,
         auto_sync_ativo: Number(row.auto_sync_ativo),
         intervalo_minutos: Number(row.intervalo_minutos),
         ftp_port: Number(row.ftp_port || 21),
@@ -57,14 +65,15 @@ export function getSyncConfig(): SyncConfig {
     console.error('[ConfigSync] Erro ao carregar do banco:', err);
   }
 
+  const vix = presets.VIXHOST;
   return {
     modo_sincronizacao: 'FTP',
     provedor_ftp: 'VIXHOST',
     pasta_cliente_ftp: 'fabricio',
-    ftp_host: 'ftp.consuldatasistemas.com.br',
-    ftp_port: 21,
-    ftp_user: 'consuldata',
-    ftp_password: '8F1h#7ok',
+    ftp_host: vix.host,
+    ftp_port: vix.port,
+    ftp_user: vix.user,
+    ftp_password: vix.password,
     ftp_dir: 'cliente/fabricio',
     pasta_local_pbi: '',
     intervalo_minutos: 5,
@@ -75,19 +84,20 @@ export function getSyncConfig(): SyncConfig {
 export function saveSyncConfig(cfg: Partial<SyncConfig>): SyncConfig {
   const current = getSyncConfig();
   const updated: SyncConfig = { ...current, ...cfg };
+  const presets = getFtpPresets();
 
   // Calculate ftp_dir automatically if using standard presets
   if (updated.provedor_ftp === 'VIXHOST') {
-    updated.ftp_host = FTP_PRESETS.VIXHOST.host;
-    updated.ftp_port = FTP_PRESETS.VIXHOST.port;
-    updated.ftp_user = FTP_PRESETS.VIXHOST.user;
-    updated.ftp_password = FTP_PRESETS.VIXHOST.password;
+    updated.ftp_host = presets.VIXHOST.host;
+    updated.ftp_port = presets.VIXHOST.port;
+    updated.ftp_user = presets.VIXHOST.user;
+    updated.ftp_password = updated.ftp_password || presets.VIXHOST.password;
     updated.ftp_dir = `cliente/${(updated.pasta_cliente_ftp || '').trim()}`;
   } else if (updated.provedor_ftp === 'UOLHOST') {
-    updated.ftp_host = FTP_PRESETS.UOLHOST.host;
-    updated.ftp_port = FTP_PRESETS.UOLHOST.port;
-    updated.ftp_user = FTP_PRESETS.UOLHOST.user;
-    updated.ftp_password = FTP_PRESETS.UOLHOST.password;
+    updated.ftp_host = presets.UOLHOST.host;
+    updated.ftp_port = presets.UOLHOST.port;
+    updated.ftp_user = presets.UOLHOST.user;
+    updated.ftp_password = updated.ftp_password || presets.UOLHOST.password;
     updated.ftp_dir = `cliente/${(updated.pasta_cliente_ftp || '').trim()}`;
   }
 
@@ -233,17 +243,18 @@ export async function testFtpConnection(options?: FtpSyncOptions): Promise<{
   let password = options?.password || cfg.ftp_password;
   let remoteDir = options?.remoteDir || cfg.ftp_dir || `cliente/${clientFolder}`;
 
+  const presets = getFtpPresets();
   if (provider === 'VIXHOST') {
-    host = FTP_PRESETS.VIXHOST.host;
-    port = FTP_PRESETS.VIXHOST.port;
-    user = FTP_PRESETS.VIXHOST.user;
-    password = FTP_PRESETS.VIXHOST.password;
+    host = presets.VIXHOST.host;
+    port = presets.VIXHOST.port;
+    user = presets.VIXHOST.user;
+    password = password || presets.VIXHOST.password;
     remoteDir = `cliente/${clientFolder}`;
   } else if (provider === 'UOLHOST') {
-    host = FTP_PRESETS.UOLHOST.host;
-    port = FTP_PRESETS.UOLHOST.port;
-    user = FTP_PRESETS.UOLHOST.user;
-    password = FTP_PRESETS.UOLHOST.password;
+    host = presets.UOLHOST.host;
+    port = presets.UOLHOST.port;
+    user = presets.UOLHOST.user;
+    password = password || presets.UOLHOST.password;
     remoteDir = `cliente/${clientFolder}`;
   }
 
@@ -331,17 +342,18 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
   let password = options?.password || cfg.ftp_password;
   let remoteDir = options?.remoteDir || cfg.ftp_dir || `cliente/${clientFolder}`;
 
+  const presets = getFtpPresets();
   if (provider === 'VIXHOST') {
-    host = FTP_PRESETS.VIXHOST.host;
-    port = FTP_PRESETS.VIXHOST.port;
-    user = FTP_PRESETS.VIXHOST.user;
-    password = FTP_PRESETS.VIXHOST.password;
+    host = presets.VIXHOST.host;
+    port = presets.VIXHOST.port;
+    user = presets.VIXHOST.user;
+    password = password || presets.VIXHOST.password;
     remoteDir = `cliente/${clientFolder}`;
   } else if (provider === 'UOLHOST') {
-    host = FTP_PRESETS.UOLHOST.host;
-    port = FTP_PRESETS.UOLHOST.port;
-    user = FTP_PRESETS.UOLHOST.user;
-    password = FTP_PRESETS.UOLHOST.password;
+    host = presets.UOLHOST.host;
+    port = presets.UOLHOST.port;
+    user = presets.UOLHOST.user;
+    password = password || presets.UOLHOST.password;
     remoteDir = `cliente/${clientFolder}`;
   }
 

@@ -12,12 +12,14 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - FTP_HOST=${FTP_HOST:-ftp.consuldatasistemas.com.br}
-      - FTP_PORT=${FTP_PORT:-21}
-      - FTP_USER=${FTP_USER:-consuldata}
-      - FTP_PASSWORD=${FTP_PASSWORD:-8F1h#7ok}
-      - FTP_DIR=${FTP_DIR:-clientes/fabricio}
-      - SYNC_CRON=${SYNC_CRON:-*/5 * * * *}
+      - FTP_VIXHOST_HOST=${FTP_VIXHOST_HOST:-ftp.consuldatasistemas.com.br}
+      - FTP_VIXHOST_PORT=${FTP_VIXHOST_PORT:-21}
+      - FTP_VIXHOST_USER=${FTP_VIXHOST_USER:-consuldata}
+      - FTP_VIXHOST_PASSWORD=${FTP_VIXHOST_PASSWORD:-}
+      - FTP_UOLHOST_HOST=${FTP_UOLHOST_HOST:-ftp.sistemaplenus.com.br}
+      - FTP_UOLHOST_PORT=${FTP_UOLHOST_PORT:-21}
+      - FTP_UOLHOST_USER=${FTP_UOLHOST_USER:-sistemaplenus}
+      - FTP_UOLHOST_PASSWORD=${FTP_UOLHOST_PASSWORD:-}
       - TZ=America/Sao_Paulo
     volumes:
       - ./data:/app/server/data

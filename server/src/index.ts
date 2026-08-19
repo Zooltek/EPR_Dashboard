@@ -8,15 +8,30 @@ import { runFullSync, startPbiDirectoryWatcher } from './services/ftpSyncService
 import { dashboardRouter } from './routes/dashboard';
 import { adminRouter } from './routes/admin';
 
+// Carrega variáveis padrão e segredos (.env.secrets) com precedência
 dotenv.config();
+const possibleSecrets = [
+  path.resolve(process.cwd(), '.env.secrets'),
+  path.resolve(__dirname, '../../.env.secrets'),
+  path.resolve(__dirname, '../.env.secrets'),
+];
+for (const secretFile of possibleSecrets) {
+  if (fs.existsSync(secretFile)) {
+    dotenv.config({ path: secretFile, override: true });
+    break;
+  }
+}
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+
+// Validação estrita da porta de rede (1 a 65535)
+const parsedPort = Number(process.env.PORT);
+const PORT = (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) ? parsedPort : 3001;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
-// Initialize Database Schema and Default Enterprise/Store
+// Initialize Database Schema
 initDatabase();
 
 // API Routes (suporta tanto acesso direto /api quanto via subpath de proxy /epr/api)
