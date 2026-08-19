@@ -27,7 +27,7 @@ export const StoreComparisonPage: React.FC<StoreComparisonPageProps> = ({ filter
   const [sortField, setSortField] = useState<keyof StoreMetrics>('faturamento');
   const [sortAsc, setSortAsc] = useState(false);
 
-  useEffect(() => {
+  const fetchComparison = () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filters.period) params.append('period', filters.period);
@@ -38,6 +38,14 @@ export const StoreComparisonPage: React.FC<StoreComparisonPageProps> = ({ filter
       .then(res => setStores(res.data.stores || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchComparison();
+
+    const handleSync = () => fetchComparison();
+    window.addEventListener('pbi_sync_completed', handleSync);
+    return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, [filters]);
 
   const handleSort = (field: keyof StoreMetrics) => {

@@ -50,21 +50,13 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
     // File read error
   }
 
-  // 1. Validate filename structure
+  // 1. Validate filename structure (ignora arquivos fora do padrao PBI)
   if (!parsed) {
-    db.prepare(`
-      INSERT INTO pbi_arquivo (nome_arquivo, cnpj_loja, data_pbi, hora_pbi, tamanho_bytes, status, mensagem_erro)
-      VALUES (?, '00000000000000', '', '', ?, 'INVALIDO', 'Nome de arquivo fora do padrao PBI_<CNPJ>_<AAAAMMDD>_<HHMMSS>.zip')
-      ON CONFLICT(nome_arquivo) DO UPDATE SET
-        status = 'INVALIDO',
-        mensagem_erro = 'Nome de arquivo fora do padrao PBI_<CNPJ>_<AAAAMMDD>_<HHMMSS>.zip'
-    `).run(filename, fileSize);
-
     return {
       success: false,
       filename,
-      status: 'INVALIDO',
-      message: 'Nome de arquivo fora do padrão PBI_<CNPJ>_<AAAAMMDD>_<HHMMSS>.zip',
+      status: 'IGNORADO',
+      message: 'Arquivo ignorado: não é um arquivo PBI válido.',
     };
   }
 

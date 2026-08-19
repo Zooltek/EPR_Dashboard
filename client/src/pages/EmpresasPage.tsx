@@ -11,7 +11,9 @@ import {
   RefreshCw, 
   CheckCircle2, 
   AlertCircle,
-  Save
+  Save,
+  Database,
+  Download
 } from 'lucide-react';
 
 interface SyncConfig {
@@ -203,7 +205,7 @@ export const EmpresasPage: React.FC = () => {
                         checked={config.provedor_ftp === 'VIXHOST'} 
                         onChange={() => setConfig({ ...config, provedor_ftp: 'VIXHOST' })} 
                       />
-                      <span><strong>VixHost (Consuldata)</strong> <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>- ftp.consuldatasistemas.com.br</span></span>
+                      <span><strong>VixHost</strong></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
                       <input 
@@ -212,7 +214,7 @@ export const EmpresasPage: React.FC = () => {
                         checked={config.provedor_ftp === 'UOLHOST'} 
                         onChange={() => setConfig({ ...config, provedor_ftp: 'UOLHOST' })} 
                       />
-                      <span><strong>UOLHost (Plenus)</strong> <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>- ftp.sistemaplenus.com.br</span></span>
+                      <span><strong>UOLHost</strong></span>
                     </label>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '0.85rem' }}>
                       <input 
@@ -415,7 +417,46 @@ export const EmpresasPage: React.FC = () => {
           </form>
         </div>
 
-        {/* Card 2: Cadastro e Unidades de Lojas */}
+        {/* Card 2: Backup e Segurança dos Dados Locais */}
+        <div className="chart-card col-12" style={{ marginBottom: 24 }}>
+          <div className="chart-header">
+            <span className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <Database size={20} color="var(--primary)" /> Backup e Segurança dos Dados Locais
+            </span>
+          </div>
+
+          <div style={{ padding: '8px 4px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+            <div>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-main)', fontWeight: 600 }}>
+                Cópia de Segurança Completa do Banco de Dados (.sqlite)
+              </p>
+              <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Gera um arquivo de backup com todas as vendas, produtos, clientes, metas e configurações do sistema.
+              </p>
+            </div>
+
+            <a
+              href={`${api.defaults.baseURL || ''}/api/admin/backup-db`}
+              download
+              className="btn-page active"
+              style={{ 
+                padding: '10px 20px', 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: 8, 
+                fontSize: '0.85rem', 
+                fontWeight: 600,
+                textDecoration: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <Download size={16} />
+              Fazer Backup dos Dados
+            </a>
+          </div>
+        </div>
+
+        {/* Card 3: Cadastro e Unidades de Lojas */}
         <div className="chart-card col-12">
           <div className="chart-header">
             <span className="chart-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

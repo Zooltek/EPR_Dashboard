@@ -154,6 +154,19 @@ export interface SyncSummary {
   importResults: ImportResult[];
 }
 
+export const isPbiZip = (name: string) => {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.zip') && lower.startsWith('pbi');
+};
+
+let syncVersion = 1;
+export function getSyncVersion() {
+  return syncVersion;
+}
+export function incrementSyncVersion() {
+  syncVersion++;
+}
+
 /**
  * Processa todos os arquivos .zip de um diretório local
  */
@@ -176,7 +189,7 @@ export async function syncLocalPbiFolder(targetDir?: string): Promise<{
 
   console.log(`[PBI Local] Escaneando pasta local por arquivos PBI: ${resolvedPath}`);
   const entries = fs.readdirSync(resolvedPath);
-  const zipFiles = entries.filter(f => f.toLowerCase().endsWith('.zip'));
+  const zipFiles = entries.filter(isPbiZip);
 
   for (const zip of zipFiles) {
     filesFound.push(zip);
@@ -184,6 +197,9 @@ export async function syncLocalPbiFolder(targetDir?: string): Promise<{
     try {
       const res = await importPbiZip(fullPath);
       importResults.push(res);
+      if (res.success && (res.processedRecords || 0) > 0) {
+        incrementSyncVersion();
+      }
     } catch (e: any) {
       console.error(`[PBI Local] Erro ao importar arquivo ${zip}:`, e.message);
       importResults.push({
@@ -276,12 +292,12 @@ export async function testFtpConnection(options?: FtpSyncOptions): Promise<{
     }
 
     const list = await client.list();
-    const zipEntries = list.filter(item => item.name.toLowerCase().endsWith('.zip')).map(item => item.name);
+    const zipEntries = list.filter(item => isPbiZip(item.name)).map(item => item.name);
 
     client.close();
     return {
       success: true,
-      message: `Conectado com sucesso em ${host}! Pasta acessada: '${accessedDir || '/'}' com ${zipEntries.length} arquivo(s) .zip encontrados.`,
+      message: `Conectado com sucesso em ${host}! Pasta acessada: '${accessedDir || '/'}' com ${zipEntries.length} arquivo(s) PBI encontrados.`,
       filesFound: zipEntries,
       currentDir: accessedDir,
     };
@@ -394,29 +410,28 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
     }
 
     const list = await client.list();
-    const zipEntries = list.filter(item => item.name.toLowerCase().endsWith('.zip'));
+    const zipEntries = list.filter(item => isPbiZip(item.name));
 
     for (const item of zipEntries) {
       remoteFilesFound.push(item.name);
       const localZipPath = path.join(downloadsDir, item.name);
 
-      let needsDownload = true;
-      if (fs.existsSync(localZipPath)) {
-        const localStats = fs.statSync(localZipPath);
-        if (localStats.size === item.size && item.size > 0) {
-          needsDownload = false;
-        }
+      // Checa se ja foi processado no banco antes de baixar
+      const existingInDb = db.prepare(`SELECT status FROM pbi_arquivo WHERE nome_arquivo = ?`).get(item.name) as { status: string } | undefined;
+      if (existingInDb && existingInDb.status === 'ATUALIZADA') {
+        continue;
       }
 
-      if (needsDownload) {
-        console.log(`[FTP] Baixando ${item.name} (${item.size} bytes)...`);
-        await client.downloadTo(localZipPath, item.name);
-        downloadedFiles.push(item.name);
-      }
+      console.log(`[FTP] Baixando ${item.name} (${item.size} bytes)...`);
+      await client.downloadTo(localZipPath, item.name);
+      downloadedFiles.push(item.name);
 
       try {
         const result = await importPbiZip(localZipPath);
         importResults.push(result);
+        if (result.success && (result.processedRecords || 0) > 0) {
+          incrementSyncVersion();
+        }
       } catch (err: any) {
         console.error(`[PBI Importer] Erro ao processar ${item.name}:`, err.message);
         importResults.push({
@@ -425,6 +440,13 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
           status: 'ERRO',
           message: `Erro de leitura do ZIP: ${err.message}`,
         });
+      } finally {
+        // Remove o arquivo baixado apos processamento para nao ocupar espaco em disco
+        try {
+          if (fs.existsSync(localZipPath)) {
+            fs.unlinkSync(localZipPath);
+          }
+        } catch (_) {}
       }
     }
 
@@ -432,7 +454,7 @@ export async function syncPbiFromFtp(options?: FtpSyncOptions): Promise<{
 
     return {
       ftpConnected: true,
-      ftpMessage: `FTP conectado com sucesso! ${zipEntries.length} arquivo(s) ZIP no FTP (${provider}).`,
+      ftpMessage: `FTP conectado com sucesso! ${zipEntries.length} arquivo(s) PBI no FTP (${provider}).`,
       remoteFilesFound,
       downloadedFiles,
       importResults,

@@ -21,6 +21,10 @@ export const PbiFilesPage: React.FC = () => {
 
   useEffect(() => {
     fetchLogs();
+
+    const handleSync = () => fetchLogs();
+    window.addEventListener('pbi_sync_completed', handleSync);
+    return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, []);
 
   const handleManualSync = () => {
@@ -40,9 +44,9 @@ export const PbiFilesPage: React.FC = () => {
   };
 
   const handleUploadFiles = async (files: FileList | File[]) => {
-    const zipFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.zip'));
+    const zipFiles = Array.from(files).filter(f => f.name.toLowerCase().endsWith('.zip') && f.name.toLowerCase().startsWith('pbi'));
     if (zipFiles.length === 0) {
-      setUploadFeedback({ type: 'error', message: 'Selecione apenas arquivos compactados com extensão .zip' });
+      setUploadFeedback({ type: 'error', message: 'Selecione apenas arquivos de dados PBI compactados (ex: PBI_CNPJ_DATA_HORA.zip)' });
       return;
     }
 

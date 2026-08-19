@@ -39,7 +39,7 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
   const [totalCustomers, setTotalCustomers] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchCustomers = () => {
     setLoading(true);
     const params = new URLSearchParams();
     params.append('page', String(page));
@@ -59,6 +59,14 @@ export const CustomersPage: React.FC<CustomersPageProps> = ({ overviewData, filt
       })
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchCustomers();
+
+    const handleSync = () => fetchCustomers();
+    window.addEventListener('pbi_sync_completed', handleSync);
+    return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, [filters, page, search]);
 
   const formatCurrency = (val: number) => {

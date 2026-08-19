@@ -185,6 +185,30 @@ function createMainWindow() {
           label: 'Ver Arquivo de Log',
           click: () => shell.openPath(logFile),
         },
+        {
+          label: 'Fazer Backup dos Dados (.sqlite)',
+          click: async () => {
+            try {
+              const sqliteSource = path.join(userDataDir, 'dashboard.sqlite');
+              const { filePath } = await dialog.showSaveDialog(mainWindow, {
+                title: 'Salvar Backup do Banco de Dados',
+                defaultPath: `backup-amura-dashboard-${new Date().toISOString().slice(0, 10)}.sqlite`,
+                filters: [{ name: 'SQLite Database', extensions: ['sqlite', 'db'] }],
+              });
+              if (filePath) {
+                fs.copyFileSync(sqliteSource, filePath);
+                dialog.showMessageBox(mainWindow, {
+                  type: 'info',
+                  title: 'Backup Concluído',
+                  message: 'Cópia de segurança salva com sucesso!',
+                  detail: `Arquivo salvo em:\n${filePath}`,
+                });
+              }
+            } catch (err) {
+              dialog.showErrorBox('Erro no Backup', err.message);
+            }
+          },
+        },
         { type: 'separator' },
         { label: 'Sair', role: 'quit' },
       ],

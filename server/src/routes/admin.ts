@@ -155,8 +155,21 @@ adminRouter.post('/upload-pbi', upload.array('files', 20), async (req: Request, 
     const results = [];
     for (const file of files) {
       console.log(`[Upload Direto] Processando arquivo: ${file.originalname} (${file.size} bytes)`);
-      const result = await importPbiZip(file.path);
-      results.push(result);
+      try {
+        const result = await importPbiZip(file.path);
+        results.push(result);
+        if (result.success && (result.processedRecords || 0) > 0) {
+          const { incrementSyncVersion } = require('../services/ftpSyncService');
+          incrementSyncVersion();
+        }
+      } finally {
+        // Remove o arquivo enviado apos o processamento para nao ocupar espaco
+        try {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        } catch (_) {}
+      }
     }
 
     res.json({
@@ -199,6 +212,41 @@ adminRouter.post('/test-ftp', async (req: Request, res: Response) => {
     res.json(result);
   } catch (err: any) {
     res.status(500).json({ success: false, message: err.message, filesFound: [] });
+  }
+});
+
+// 8. Backup dos Dados Locais (Download do SQLite)
+adminRouter.get('/backup-db', (req: Request, res: Response) => {
+  try {
+    const { dbPath } = require('../db/database');
+    // Forca o SQLite a despejar todo o WAL para o arquivo principal
+    db.pragma('wal_checkpoint(TRUNCATE)');
+
+    if (!fs.existsSync(dbPath)) {
+      return res.status(404).json({ error: 'Arquivo de banco de dados não encontrado.' });
+    }
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `backup-amura-dashboard-${dateStr}.sqlite`;
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Type', 'application/x-sqlite3');
+    res.download(dbPath, filename);
+  } catch (err: any) {
+    console.error('[Admin API] Erro ao gerar backup:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 9. Status de Versão da Sincronização (para Auto-Reload)
+adminRouter.get('/sync-status', (req: Request, res: Response) => {
+  try {
+    const { getSyncVersion } = require('../services/ftpSyncService');
+    res.json({
+      syncVersion: getSyncVersion(),
+      timestamp: Date.now(),
+    });
+  } catch (err: any) {
+    res.json({ syncVersion: 1, timestamp: Date.now() });
   }
 });
 

@@ -8,7 +8,7 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
-const dbPath = path.join(dbDir, 'dashboard.sqlite');
+export const dbPath = path.join(dbDir, 'dashboard.sqlite');
 export const db = new Database(dbPath);
 
 // Enable Write-Ahead Logging (WAL) for concurrent read performance
@@ -235,25 +235,6 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_produto_colecao ON produto(colecao_id);
   `);
 
-  // Ensure Default Empresa and Store exist for initial demo/import
-  const empresaStmt = db.prepare(`SELECT count(*) as count FROM empresa`);
-  const { count } = empresaStmt.get() as { count: number };
-  
-  if (count === 0) {
-    const insertEmpresa = db.prepare(`
-      INSERT INTO empresa (razao_social, cnpj, nome_fantasia, status)
-      VALUES ('GDB CALCADOS LTDA', '39310768000105', 'GDB CALÇADOS', 'ATIVO')
-    `);
-    const result = insertEmpresa.run();
-    const empresaId = result.lastInsertRowid;
-
-    const insertLoja = db.prepare(`
-      INSERT INTO loja (empresa_id, id_loja_erp, cnpj, nome, status)
-      VALUES (?, 2, '39310768000105', 'Loja 02 - Cachoeiro Centro', 'ATIVO')
-    `);
-    insertLoja.run(empresaId);
-  }
-
   // Ensure Default Sync Configuration exists
   const syncStmt = db.prepare(`SELECT count(*) as count FROM configuracao_sync`);
   const syncRow = syncStmt.get() as { count: number };
@@ -263,4 +244,9 @@ export function initDatabase() {
       VALUES (1, 'FTP', 'VIXHOST', 'fabricio', 'ftp.consuldatasistemas.com.br', 21, 'consuldata', '8F1h#7ok', 'cliente/fabricio', '', 5, 1)
     `).run();
   }
+
+  // Limpa registros invalidos legados de arquivos nao-PBI (ex: CXA*.zip)
+  try {
+    db.prepare(`DELETE FROM pbi_arquivo WHERE nome_arquivo NOT LIKE 'PBI%'`).run();
+  } catch {}
 }

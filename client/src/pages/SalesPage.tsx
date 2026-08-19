@@ -14,7 +14,7 @@ export const SalesPage: React.FC<SalesPageProps> = ({ overviewData, filters, the
   const [salesByHour, setSalesByHour] = useState<{ hora: string; vendas: number; faturamento: number }[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchSales = () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filters.period) params.append('period', filters.period);
@@ -26,6 +26,14 @@ export const SalesPage: React.FC<SalesPageProps> = ({ overviewData, filters, the
       .then(res => setSalesByHour(res.data.salesByHour || []))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchSales();
+
+    const handleSync = () => fetchSales();
+    window.addEventListener('pbi_sync_completed', handleSync);
+    return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, [filters]);
 
   if (!overviewData) return null;

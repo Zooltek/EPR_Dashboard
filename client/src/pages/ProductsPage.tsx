@@ -28,7 +28,7 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ filters }) => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchProducts = () => {
     setLoading(true);
     const params = new URLSearchParams();
     params.append('page', String(page));
@@ -40,6 +40,14 @@ export const ProductsPage: React.FC<ProductsPageProps> = ({ filters }) => {
       .then(res => setData(res.data))
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchProducts();
+
+    const handleSync = () => fetchProducts();
+    window.addEventListener('pbi_sync_completed', handleSync);
+    return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, [filters, page, search]);
 
   const formatCurrency = (val: number) => {

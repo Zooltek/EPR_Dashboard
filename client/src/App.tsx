@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { api } from './services/api';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -58,11 +58,39 @@ export const App: React.FC = () => {
   const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
+  const lastSyncVersionRef = useRef<number | null>(null);
+
   // Fetch Filter Dropdown Options
-  useEffect(() => {
+  const fetchFilters = () => {
     api.get('/api/admin/filters')
       .then(res => setFilterOptions(res.data))
       .catch(err => console.error('Erro ao carregar opções de filtro:', err));
+  };
+
+  useEffect(() => {
+    fetchFilters();
+
+    // Auto-reload quando novos PBIs forem consumidos
+    const checkSync = () => {
+      api.get('/api/admin/sync-status')
+        .then(res => {
+          const v = res.data?.syncVersion;
+          if (v !== undefined) {
+            if (lastSyncVersionRef.current !== null && lastSyncVersionRef.current !== v) {
+              console.log(`[Auto-Reload] Nova sincronização detectada (v${v}). Recarregando dados e lojas...`);
+              fetchFilters();
+              fetchOverview();
+              window.dispatchEvent(new CustomEvent('pbi_sync_completed', { detail: { syncVersion: v } }));
+            }
+            lastSyncVersionRef.current = v;
+          }
+        })
+        .catch(() => {});
+    };
+
+    checkSync();
+    const interval = setInterval(checkSync, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch Overview Data on filter change
@@ -91,7 +119,10 @@ export const App: React.FC = () => {
 
   const handleRefreshSync = () => {
     api.post('/api/admin/sync-pbi')
-      .then(() => fetchOverview())
+      .then(() => {
+        fetchFilters();
+        fetchOverview();
+      })
       .catch(err => console.error(err));
   };
 
