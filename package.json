@@ -24,16 +24,18 @@
     "appId": "com.zooltek.amuradashboard",
     "productName": "Amura Dashboard",
     "copyright": "Copyright © 2026 Zooltek",
+    "npmRebuild": false,
     "directories": {
       "output": "dist-electron"
     },
     "files": [
       "desktop/**/*",
       "server/dist/**/*",
-      "server/package.json",
       "client/dist/**/*",
       "PBI/**/*",
-      "Logo Amura.png"
+      "Logo Amura.png",
+      "package.json",
+      "node_modules/**/*"
     ],
     "extraResources": [
       {
