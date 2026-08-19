@@ -157,7 +157,7 @@ export const App: React.FC = () => {
           <SalesPage overviewData={overviewData} filters={filters} theme={theme} />
         )}
         {activeTab === 'produtos' && (
-          <ProductsPage filters={filters} />
+          <ProductsPage filters={filters} theme={theme} />
         )}
         {activeTab === 'clientes' && (
           <CustomersPage overviewData={overviewData} filters={filters} />

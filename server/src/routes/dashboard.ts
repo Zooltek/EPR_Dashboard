@@ -301,15 +301,125 @@ dashboardRouter.get('/sales', (req: Request, res: Response) => {
   `;
   const salesByHour = db.prepare(salesByHourSql).all(curStart, curEnd, ...filter.params);
 
+  // Curva ABC de Produtos
+  const abcSql = `
+    SELECT 
+      p.ref_id,
+      COALESCE(p.nome, vi.ref_id) as produto,
+      COALESCE(m.nome, 'Sem Marca') as marca,
+      COALESCE(SUM(CASE WHEN vi.entrada = 0 THEN vi.total_liq ELSE -vi.total_liq END), 0) as faturamento,
+      COALESCE(SUM(CASE WHEN vi.entrada = 0 THEN vi.qtd ELSE -vi.qtd END), 0) as quantidade
+    FROM venda_item vi
+    JOIN venda_cab vc ON vc.loja_id = vi.loja_id AND vc.d_venda = vi.d_venda AND vc.c_venda = vi.c_venda
+    LEFT JOIN produto p ON vi.ref_id = p.ref_id
+    LEFT JOIN marca m ON p.marca_id = m.id
+    WHERE vc.d_venda BETWEEN ? AND ? AND vc.cancelada = 0 AND vi.cancelado = 0 ${filter.whereSql}
+    GROUP BY p.ref_id
+    HAVING faturamento > 0 OR quantidade > 0
+  `;
+  const allAbcItems = db.prepare(abcSql).all(curStart, curEnd, ...filter.params) as {
+    ref_id: string;
+    produto: string;
+    marca: string;
+    faturamento: number;
+    quantidade: number;
+  }[];
+
+  // Cálculo da Curva ABC por Faturamento (Valor) com parâmetros 20% (A), 30% (B), 50% (C)
+  const sortedByValor = [...allAbcItems].sort((a, b) => b.faturamento - a.faturamento);
+  const totalValor = sortedByValor.reduce((acc, item) => acc + item.faturamento, 0);
+  const totalQtd = sortedByValor.reduce((acc, item) => acc + item.quantidade, 0);
+  const countTotal = sortedByValor.length;
+
+  const countA = Math.max(1, Math.ceil(countTotal * 0.20));
+  const countB = Math.max(1, Math.ceil(countTotal * 0.30));
+
+  let accValor = 0;
+  const itemsByValor = sortedByValor.map((item, idx) => {
+    accValor += item.faturamento;
+    const classe = idx < countA ? 'A' : (idx < countA + countB ? 'B' : 'C');
+    const pctAcumulado = totalValor > 0 ? (accValor / totalValor) * 100 : 0;
+    return {
+      ...item,
+      classe,
+      pctAcumulado,
+    };
+  });
+
+  // Cálculo da Curva ABC por Quantidade (Volume)
+  const sortedByQtd = [...allAbcItems].sort((a, b) => b.quantidade - a.quantidade);
+  let accQtd = 0;
+  const itemsByQtd = sortedByQtd.map((item, idx) => {
+    accQtd += item.quantidade;
+    const classe = idx < countA ? 'A' : (idx < countA + countB ? 'B' : 'C');
+    const pctAcumulado = totalQtd > 0 ? (accQtd / totalQtd) * 100 : 0;
+    return {
+      ...item,
+      classe,
+      pctAcumulado,
+    };
+  });
+
+  const resumoValor = {
+    totalItens: countTotal,
+    totalFaturamento: totalValor,
+    classeA: {
+      qtdProdutos: itemsByValor.filter(i => i.classe === 'A').length,
+      faturamento: itemsByValor.filter(i => i.classe === 'A').reduce((acc, i) => acc + i.faturamento, 0),
+      pctFaturamento: totalValor > 0 ? (itemsByValor.filter(i => i.classe === 'A').reduce((acc, i) => acc + i.faturamento, 0) / totalValor) * 100 : 0,
+    },
+    classeB: {
+      qtdProdutos: itemsByValor.filter(i => i.classe === 'B').length,
+      faturamento: itemsByValor.filter(i => i.classe === 'B').reduce((acc, i) => acc + i.faturamento, 0),
+      pctFaturamento: totalValor > 0 ? (itemsByValor.filter(i => i.classe === 'B').reduce((acc, i) => acc + i.faturamento, 0) / totalValor) * 100 : 0,
+    },
+    classeC: {
+      qtdProdutos: itemsByValor.filter(i => i.classe === 'C').length,
+      faturamento: itemsByValor.filter(i => i.classe === 'C').reduce((acc, i) => acc + i.faturamento, 0),
+      pctFaturamento: totalValor > 0 ? (itemsByValor.filter(i => i.classe === 'C').reduce((acc, i) => acc + i.faturamento, 0) / totalValor) * 100 : 0,
+    },
+  };
+
+  const resumoQtd = {
+    totalItens: countTotal,
+    totalVolume: totalQtd,
+    classeA: {
+      qtdProdutos: itemsByQtd.filter(i => i.classe === 'A').length,
+      volume: itemsByQtd.filter(i => i.classe === 'A').reduce((acc, i) => acc + i.quantidade, 0),
+      pctVolume: totalQtd > 0 ? (itemsByQtd.filter(i => i.classe === 'A').reduce((acc, i) => acc + i.quantidade, 0) / totalQtd) * 100 : 0,
+    },
+    classeB: {
+      qtdProdutos: itemsByQtd.filter(i => i.classe === 'B').length,
+      volume: itemsByQtd.filter(i => i.classe === 'B').reduce((acc, i) => acc + i.quantidade, 0),
+      pctVolume: totalQtd > 0 ? (itemsByQtd.filter(i => i.classe === 'B').reduce((acc, i) => acc + i.quantidade, 0) / totalQtd) * 100 : 0,
+    },
+    classeC: {
+      qtdProdutos: itemsByQtd.filter(i => i.classe === 'C').length,
+      volume: itemsByQtd.filter(i => i.classe === 'C').reduce((acc, i) => acc + i.quantidade, 0),
+      pctVolume: totalQtd > 0 ? (itemsByQtd.filter(i => i.classe === 'C').reduce((acc, i) => acc + i.quantidade, 0) / totalQtd) * 100 : 0,
+    },
+  };
+
   res.json({
     dateRange: { curStart, curEnd },
     salesByHour,
+    curvaAbc: {
+      porValor: {
+        resumo: resumoValor,
+        items: itemsByValor,
+      },
+      porQuantidade: {
+        resumo: resumoQtd,
+        items: itemsByQtd,
+      },
+    },
   });
 });
 
-// 3. PRODUTOS E ESTOQUE API (Com Paginação e Busca)
+// 3. PRODUTOS E ESTOQUE API (Com Lucro Bruto Potencial, Faixa de Giro e Estoque Parado)
 dashboardRouter.get('/products', (req: Request, res: Response) => {
   const { lojaId, search } = req.query;
+  const idleDaysThreshold = parseInt(req.query.idleDays as string, 10) || 30;
   const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
   const limit = Math.max(1, parseInt(req.query.limit as string, 10) || 10);
   const offset = (page - 1) * limit;
@@ -332,54 +442,125 @@ dashboardRouter.get('/products', (req: Request, res: Response) => {
   const stockKpisSql = `
     SELECT 
       COUNT(DISTINCT e.ref_id) as total_produtos,
-      SUM(e.qtd) as total_estoque,
-      SUM(e.qtd * p.preco_custo) as valor_estoque_custo,
-      SUM(e.qtd * p.preco_tab1) as valor_estoque_venda,
-      SUM(CASE WHEN e.qtd <= 0 THEN 1 ELSE 0 END) as produtos_sem_estoque,
-      SUM(CASE WHEN e.qtd > 0 AND e.qtd <= 2 THEN 1 ELSE 0 END) as estoque_baixo
+      COALESCE(SUM(e.qtd), 0) as total_estoque,
+      COALESCE(SUM(e.qtd * p.preco_custo), 0) as valor_estoque_custo,
+      COALESCE(SUM(e.qtd * p.preco_tab1), 0) as valor_estoque_venda
     FROM estoque e
     JOIN produto p ON e.ref_id = p.ref_id
     LEFT JOIN marca m ON p.marca_id = m.id
     ${whereClause}
   `;
-  const stockKpis = db.prepare(stockKpisSql).get(...params) as any;
+  const rawKpis = db.prepare(stockKpisSql).get(...params) as any;
+  const custo = Number(rawKpis?.valor_estoque_custo) || 0;
+  const venda = Number(rawKpis?.valor_estoque_venda) || 0;
+  const lucroBrutoPotencial = venda - custo;
+  const margemPotencialPct = venda > 0 ? (lucroBrutoPotencial / venda) * 100 : 0;
 
-  const countSql = `
-    SELECT COUNT(*) as total 
-    FROM estoque e 
-    JOIN produto p ON e.ref_id = p.ref_id
-    LEFT JOIN marca m ON p.marca_id = m.id
-    ${whereClause}
-  `;
-  const countRow = db.prepare(countSql).get(...params) as { total: number };
-  const total = countRow?.total || 0;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const stockKpis = {
+    total_produtos: Number(rawKpis?.total_produtos) || 0,
+    total_estoque: Number(rawKpis?.total_estoque) || 0,
+    valor_estoque_custo: custo, // Capital investido
+    valor_estoque_venda: venda, // Potencial de faturamento
+    lucro_bruto_potencial: lucroBrutoPotencial,
+    margem_potencial_pct: margemPotencialPct,
+  };
 
-  const ruptureSql = `
+  // Análise de Estoque e Idade da Última Venda por Produto
+  const stockProductsSql = `
     SELECT 
       p.ref_id,
       p.nome as produto,
-      m.nome as marca,
-      e.tamanho,
-      c.nome as cor,
-      e.qtd
+      COALESCE(m.nome, 'Sem Marca') as marca,
+      SUM(e.qtd) as estoque,
+      p.preco_custo as custo_unitario,
+      p.preco_tab1 as preco_venda,
+      SUM(e.qtd * p.preco_custo) as valor_parado,
+      (
+        SELECT MAX(vc.d_venda)
+        FROM venda_item vi
+        JOIN venda_cab vc ON vc.loja_id = vi.loja_id AND vc.d_venda = vi.d_venda AND vc.c_venda = vi.c_venda
+        WHERE vi.ref_id = p.ref_id AND vc.cancelada = 0 AND vi.cancelado = 0
+        ${lojaId ? 'AND vc.loja_id = ' + Number(lojaId) : ''}
+      ) as ultima_venda
     FROM estoque e
     JOIN produto p ON e.ref_id = p.ref_id
     LEFT JOIN marca m ON p.marca_id = m.id
-    LEFT JOIN cor c ON e.cor_id = c.id
     ${whereClause}
-    ORDER BY p.nome ASC, e.tamanho ASC
-    LIMIT ? OFFSET ?
+    GROUP BY p.ref_id
+    HAVING estoque > 0
+    ORDER BY valor_parado DESC
   `;
-  const ruptureList = db.prepare(ruptureSql).all(...params, limit, offset);
+  const allStockProducts = db.prepare(stockProductsSql).all(...params) as any[];
+
+  const now = new Date();
+  const agingProducts = allStockProducts.map(p => {
+    let diasSemVenda = 999;
+    if (p.ultima_venda) {
+      const dt = new Date(p.ultima_venda);
+      const diffMs = now.getTime() - dt.getTime();
+      diasSemVenda = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
+    }
+    return {
+      ...p,
+      dias_sem_venda: diasSemVenda,
+      ultima_venda_formatada: p.ultima_venda 
+        ? `${p.ultima_venda.substring(8, 10)}/${p.ultima_venda.substring(5, 7)}/${p.ultima_venda.substring(0, 4)}` 
+        : 'Sem vendas registradas',
+    };
+  });
+
+  // Distribuição por Faixa de Giro
+  let valorAte30d = 0, qtdAte30d = 0;
+  let valor31a60d = 0, qtd31a60d = 0;
+  let valor61a90d = 0, qtd61a90d = 0;
+  let valorMais90d = 0, qtdMais90d = 0;
+
+  for (const p of agingProducts) {
+    if (p.dias_sem_venda <= 30) {
+      valorAte30d += p.valor_parado;
+      qtdAte30d += p.estoque;
+    } else if (p.dias_sem_venda <= 60) {
+      valor31a60d += p.valor_parado;
+      qtd31a60d += p.estoque;
+    } else if (p.dias_sem_venda <= 90) {
+      valor61a90d += p.valor_parado;
+      qtd61a90d += p.estoque;
+    } else {
+      valorMais90d += p.valor_parado;
+      qtdMais90d += p.estoque;
+    }
+  }
+
+  const totalCapital = custo || 1;
+  const agingDistribution = {
+    ate30d: { label: 'Vendido nos últimos 30 dias', valor: valorAte30d, qtd: qtdAte30d, pct: (valorAte30d / totalCapital) * 100, color: '#10b981' },
+    de31a60d: { label: '31–60 dias sem venda', valor: valor31a60d, qtd: qtd31a60d, pct: (valor31a60d / totalCapital) * 100, color: '#eab308' },
+    de61a90d: { label: '61–90 dias sem venda', valor: valor61a90d, qtd: qtd61a90d, pct: (valor61a90d / totalCapital) * 100, color: '#f97316' },
+    mais90d: { label: '+90 dias sem venda', valor: valorMais90d, qtd: qtdMais90d, pct: (valorMais90d / totalCapital) * 100, color: '#ef4444' },
+  };
+
+  // Produtos com estoque parado no limiar selecionado (ex: >= 30, 60, 90, 180)
+  const idleProducts = agingProducts.filter(p => p.dias_sem_venda >= idleDaysThreshold);
+  const totalIdleCapital = idleProducts.reduce((acc, p) => acc + p.valor_parado, 0);
+
+  const top10Idle = idleProducts.slice(0, 10);
+
+  // Paginação da tabela de produtos com estoque parado
+  const total = idleProducts.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const paginatedIdle = idleProducts.slice(offset, offset + limit);
 
   res.json({
     kpis: stockKpis,
+    agingDistribution,
+    idleDaysThreshold,
+    totalIdleCapital,
+    top10Idle,
     total,
     page,
     limit,
     totalPages,
-    ruptureList,
+    products: paginatedIdle,
   });
 });
 

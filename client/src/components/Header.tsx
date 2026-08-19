@@ -43,9 +43,10 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const currentInfo = titles[activeTab] || { title: 'Dashboard', subtitle: '' };
-  const totalStores = storesStatus.length || filterOptions.lojas.length || 1;
-  const updatedStores = storesStatus.filter(s => s.status === 'ATUALIZADA').length || (totalStores > 0 ? 1 : 0);
-  const lastSyncTime = storesStatus[0]?.data_processamento || storesStatus[0]?.data_pbi || 'Hoje 14:15';
+  const totalStores = storesStatus.length > 0 ? storesStatus.length : filterOptions.lojas.length;
+  const updatedStores = storesStatus.filter(s => s.status === 'ATUALIZADA').length;
+  const rawSync = storesStatus.find(s => s.data_processamento)?.data_processamento || storesStatus.find(s => s.data_pbi)?.data_pbi;
+  const lastSyncTime = rawSync ? String(rawSync).substring(0, 16) : '';
 
   const handlePeriodChange = (periodKey: string) => {
     setFilters(prev => ({ ...prev, period: periodKey }));
@@ -91,10 +92,16 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
 
           <div className="sync-status-badge">
-            <span className="status-dot" />
+            <span className="status-dot" style={{ backgroundColor: totalStores > 0 ? (updatedStores === totalStores ? 'var(--success)' : '#f59e0b') : '#94a3b8' }} />
             <span>
-              <strong>{updatedStores} de {totalStores} lojas atualizadas</strong>
-              <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>({lastSyncTime})</span>
+              {totalStores === 0 ? (
+                <strong style={{ color: 'var(--text-muted)' }}>Aguardando primeiro PBI</strong>
+              ) : (
+                <>
+                  <strong>{updatedStores} de {totalStores} lojas atualizadas</strong>
+                  {lastSyncTime && <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>({lastSyncTime})</span>}
+                </>
+              )}
             </span>
           </div>
 
