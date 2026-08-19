@@ -1,9 +1,11 @@
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
 
 let mainWindow = null;
+let serverProcess = null;
 const PORT = process.env.PORT || 3001;
 
 // Define Persistent AppData directory for SQLite, Downloads, and Logs
@@ -45,6 +47,21 @@ if (validClientDist) {
   log(`AVISO: Nenhum client/dist encontrado nas rotas candidatas.`);
 }
 
+function getNodeExecutable() {
+  const candidates = [
+    path.join(process.resourcesPath, 'bin/node.exe'),
+    path.join(__dirname, 'bin/node.exe'),
+    path.join(app.getAppPath(), 'desktop/bin/node.exe'),
+  ];
+  const found = candidates.find(p => fs.existsSync(p));
+  if (found) {
+    log(`Runtime Node embutido encontrado: ${found}`);
+    return found;
+  }
+  log(`Usando runtime Node do sistema.`);
+  return 'node';
+}
+
 function startBackendServer() {
   const serverCandidates = [
     path.join(app.getAppPath(), 'server/dist/index.js'),
@@ -61,16 +78,42 @@ function startBackendServer() {
     return;
   }
 
-  log(`Iniciando backend a partir de: ${serverEntry}`);
+  const nodeBin = getNodeExecutable();
+  log(`Iniciando servidor Node.js com: ${nodeBin} "${serverEntry}"`);
+
   try {
-    require(serverEntry);
-    log('Backend Express carregado com sucesso.');
+    serverProcess = spawn(nodeBin, [serverEntry], {
+      env: {
+        ...process.env,
+        EPR_DATA_DIR: dataDir,
+        PORT: String(PORT),
+        CLIENT_DIST_DIR: validClientDist || '',
+      },
+      cwd: app.getAppPath(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    serverProcess.stdout.on('data', (data) => {
+      const msg = data.toString().trim();
+      log(`[Backend stdout] ${msg}`);
+    });
+
+    serverProcess.stderr.on('data', (data) => {
+      const msg = data.toString().trim();
+      log(`[Backend stderr] ${msg}`);
+    });
+
+    serverProcess.on('exit', (code) => {
+      log(`[Backend] Processo finalizado com código: ${code}`);
+    });
+
+    log('Processo do servidor Express iniciado com sucesso.');
   } catch (err) {
-    log(`ERRO CRÍTICO ao carregar backend: ${err.stack || err.message}`);
+    log(`ERRO CRÍTICO ao iniciar processo do servidor: ${err.stack || err.message}`);
   }
 }
 
-function waitForServer(url, timeout = 20000) {
+function waitForServer(url, timeout = 25000) {
   const start = Date.now();
   return new Promise((resolve, reject) => {
     function check() {
@@ -89,7 +132,7 @@ function waitForServer(url, timeout = 20000) {
       if (Date.now() - start > timeout) {
         reject(new Error(`Servidor backend não respondeu na porta ${PORT} após ${timeout}ms`));
       } else {
-        setTimeout(check, 400);
+        setTimeout(check, 300);
       }
     }
 
@@ -162,7 +205,7 @@ function createMainWindow() {
               type: 'info',
               title: 'Sobre o Amura Dashboard',
               message: 'Amura Dashboard - Gestão e Inteligência Multilojas',
-              detail: `Versão: 1.0.0\nDesenvolvido por Zooltek\nBanco de Dados: SQLite (AppData)\nPlataforma: ${process.platform}`,
+              detail: `Versão: 1.0.0\nDesenvolvido por: Fabricio\nBanco de Dados: SQLite (AppData)\nPlataforma: ${process.platform}`,
             });
           },
         },
@@ -178,7 +221,7 @@ function createMainWindow() {
 
   const appUrl = `http://localhost:${PORT}`;
 
-  waitForServer(`${appUrl}/api/health`, 20000)
+  waitForServer(`${appUrl}/api/health`, 25000)
     .then(() => {
       log(`Conectado ao backend com sucesso! Carregando: ${appUrl}`);
       mainWindow.loadURL(appUrl);
@@ -245,7 +288,20 @@ if (!gotTheLock) {
     });
   });
 
+  app.on('before-quit', () => {
+    if (serverProcess) {
+      try {
+        serverProcess.kill();
+      } catch {}
+    }
+  });
+
   app.on('window-all-closed', () => {
+    if (serverProcess) {
+      try {
+        serverProcess.kill();
+      } catch {}
+    }
     if (process.platform !== 'darwin') {
       app.quit();
     }

@@ -18,12 +18,12 @@
     "multilojas",
     "electron"
   ],
-  "author": "Zooltek",
+  "author": "Fabricio",
   "license": "ISC",
   "build": {
-    "appId": "com.zooltek.amuradashboard",
+    "appId": "com.fabricio.amuradashboard",
     "productName": "Amura Dashboard",
-    "copyright": "Copyright © 2026 Zooltek",
+    "copyright": "Copyright © 2026 Fabricio",
     "npmRebuild": false,
     "directories": {
       "output": "dist-electron"
@@ -38,6 +38,10 @@
       "node_modules/**/*"
     ],
     "extraResources": [
+      {
+        "from": "desktop/bin/node.exe",
+        "to": "bin/node.exe"
+      },
       {
         "from": "PBI",
         "to": "PBI",

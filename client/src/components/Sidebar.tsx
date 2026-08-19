@@ -185,6 +185,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Lojas & Configuração</span>
           </div>
         </nav>
+
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border-color)', marginTop: 'auto' }}>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', textAlign: 'center' }}>
+            Desenvolvido por <strong>Fabricio</strong>
+          </span>
+        </div>
       </aside>
     </>
   );
