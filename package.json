@@ -1,0 +1,65 @@
+{
+  "name": "epr-dashboard-desktop",
+  "version": "1.0.0",
+  "description": "Dashboard Gerencial Multilojas EPR - Aplicativo Desktop",
+  "main": "desktop/main.js",
+  "scripts": {
+    "build:client": "cd client && npm run build",
+    "build:server": "cd server && npm run build",
+    "build:all": "npm run build:client && npm run build:server",
+    "desktop:start": "electron .",
+    "desktop:dev": "npm run build:all && electron .",
+    "desktop:dist": "npm run build:all && electron-builder --win nsis"
+  },
+  "keywords": [
+    "epr",
+    "dashboard",
+    "varejo",
+    "electron"
+  ],
+  "author": "Zooltek",
+  "license": "ISC",
+  "build": {
+    "appId": "com.zooltek.eprdashboard",
+    "productName": "EPR Dashboard",
+    "copyright": "Copyright © 2026 Zooltek",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "desktop/**/*",
+      "server/dist/**/*",
+      "server/package.json",
+      "server/node_modules/**/*",
+      "client/dist/**/*",
+      "PBI/**/*",
+      "Logo Amura.png"
+    ],
+    "extraResources": [
+      {
+        "from": "PBI",
+        "to": "PBI",
+        "filter": ["**/*"]
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "desktop/icon.png",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "EPR Dashboard"
+    }
+  },
+  "devDependencies": {
+    "electron": "^34.2.0",
+    "electron-builder": "^25.1.8"
+  }
+}

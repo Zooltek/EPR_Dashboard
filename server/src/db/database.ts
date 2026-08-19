@@ -2,7 +2,8 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const dbDir = path.join(__dirname, '../../data');
+const defaultDbDir = path.join(__dirname, '../../data');
+const dbDir = process.env.EPR_DATA_DIR || defaultDbDir;
 if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }

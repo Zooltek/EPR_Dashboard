@@ -16,6 +16,7 @@ dist/
 build/
 client/dist/
 server/dist/
+dist-electron/
 
 # SQLite Database & Storage
 *.sqlite
