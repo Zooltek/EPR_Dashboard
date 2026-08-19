@@ -62,7 +62,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Amura Dashboard"
+      "shortcutName": "Amura Dashboard",
+      "deleteAppDataOnUninstall": true,
+      "include": "desktop/installer.nsh"
     }
   },
   "dependencies": {
