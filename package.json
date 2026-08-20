@@ -9,7 +9,10 @@
     "build:all": "npm run build:client && npm run build:server",
     "desktop:start": "electron .",
     "desktop:dev": "npm run build:all && electron .",
-    "desktop:dist": "npm run build:all && node build_wrapper.js && electron-builder --win nsis"
+    "dist:installer": "npm run build:all && electron-builder --win nsis --x64",
+    "dist:portable": "npm run build:all && electron-builder --win portable --x64",
+    "dist:unpacked": "npm run build:all && electron-builder --win --dir --x64",
+    "dist:all": "npm run build:all && electron-builder --win nsis portable --x64"
   },
   "keywords": [
     "amura",
