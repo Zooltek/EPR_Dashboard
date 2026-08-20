@@ -52,6 +52,50 @@ export const EmpresasPage: React.FC = () => {
   const [testResult, setTestResult] = useState<{ success: boolean; message: string; filesFound?: string[] } | null>(null);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
 
+  // Backup State
+  const [isBackingUp, setIsBackingUp] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleBackupDatabase = async () => {
+    setIsBackingUp(true);
+    setBackupStatus(null);
+    try {
+      const response = await api.get('/api/admin/backup-db', {
+        responseType: 'blob',
+      });
+
+      // Se a resposta for JSON (ex: erro { error: "..." })
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const json = JSON.parse(text);
+        throw new Error(json.error || 'Erro ao gerar cópia de segurança.');
+      }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const filename = `backup-amura-dashboard-${dateStr}.sqlite`;
+
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/x-sqlite3' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+        window.URL.revokeObjectURL(url);
+      }, 200);
+
+      setBackupStatus({ type: 'success', text: `Backup "${filename}" gerado e salvo com sucesso!` });
+    } catch (err: any) {
+      console.error('Erro no backup:', err);
+      setBackupStatus({ type: 'error', text: err.message || 'Falha ao realizar o backup do banco de dados local.' });
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
   const fetchLojas = () => {
     setLoading(true);
     api.get('/api/admin/lojas')
@@ -435,25 +479,58 @@ export const EmpresasPage: React.FC = () => {
               </p>
             </div>
 
-            <a
-              href={`${api.defaults.baseURL || ''}/api/admin/backup-db`}
-              download
-              className="btn-page active"
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                type="button"
+                onClick={handleBackupDatabase}
+                disabled={isBackingUp}
+                className="btn-page active"
+                style={{ 
+                  padding: '10px 20px', 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: 8, 
+                  fontSize: '0.85rem', 
+                  fontWeight: 600,
+                  cursor: isBackingUp ? 'not-allowed' : 'pointer',
+                  opacity: isBackingUp ? 0.7 : 1,
+                  border: 'none'
+                }}
+              >
+                {isBackingUp ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    Gerando Backup...
+                  </>
+                ) : (
+                  <>
+                    <Download size={16} />
+                    Fazer Backup dos Dados (.sqlite)
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {backupStatus && (
+            <div 
               style={{ 
-                padding: '10px 20px', 
-                display: 'inline-flex', 
-                alignItems: 'center', 
-                gap: 8, 
-                fontSize: '0.85rem', 
-                fontWeight: 600,
-                textDecoration: 'none',
-                cursor: 'pointer'
+                margin: '12px 4px 0 4px', 
+                padding: '10px 14px', 
+                borderRadius: 'var(--radius-sm)', 
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: backupStatus.type === 'success' ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                color: backupStatus.type === 'success' ? 'var(--success)' : 'var(--danger)',
+                border: `1px solid ${backupStatus.type === 'success' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
               }}
             >
-              <Download size={16} />
-              Fazer Backup dos Dados
-            </a>
-          </div>
+              {backupStatus.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              <span>{backupStatus.text}</span>
+            </div>
+          )}
         </div>
 
         {/* Card 3: Cadastro e Unidades de Lojas */}

@@ -189,7 +189,16 @@ function createMainWindow() {
           label: 'Fazer Backup dos Dados (.sqlite)',
           click: async () => {
             try {
-              const sqliteSource = path.join(userDataDir, 'dashboard.sqlite');
+              const sqliteCandidates = [
+                path.join(userDataDir, 'data', 'dashboard.sqlite'),
+                path.join(userDataDir, 'dashboard.sqlite'),
+                path.join(process.cwd(), 'server/data/dashboard.sqlite'),
+                path.join(__dirname, '../server/data/dashboard.sqlite'),
+              ];
+              const sqliteSource = sqliteCandidates.find(p => fs.existsSync(p));
+              if (!sqliteSource) {
+                throw new Error('Arquivo do banco de dados (dashboard.sqlite) ainda não foi encontrado em: ' + path.join(userDataDir, 'data'));
+              }
               const { filePath } = await dialog.showSaveDialog(mainWindow, {
                 title: 'Salvar Backup do Banco de Dados',
                 defaultPath: `backup-amura-dashboard-${new Date().toISOString().slice(0, 10)}.sqlite`,

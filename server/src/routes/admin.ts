@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
-import { db } from '../db/database';
+import { db, dbPath } from '../db/database';
 import { runFullSync } from '../services/ftpSyncService';
 import { importPbiZip } from '../services/pbiImporter';
 
@@ -218,19 +218,32 @@ adminRouter.post('/test-ftp', async (req: Request, res: Response) => {
 // 8. Backup dos Dados Locais (Download do SQLite)
 adminRouter.get('/backup-db', (req: Request, res: Response) => {
   try {
-    const { dbPath } = require('../db/database');
     // Forca o SQLite a despejar todo o WAL para o arquivo principal
-    db.pragma('wal_checkpoint(TRUNCATE)');
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+    } catch (walErr) {
+      console.warn('[Admin API] Aviso no wal_checkpoint:', walErr);
+    }
 
-    if (!fs.existsSync(dbPath)) {
-      return res.status(404).json({ error: 'Arquivo de banco de dados não encontrado.' });
+    const candidatePaths = [
+      dbPath,
+      path.join(process.env.EPR_DATA_DIR || '', 'dashboard.sqlite'),
+      path.join(__dirname, '../../data/dashboard.sqlite'),
+      path.join(process.cwd(), 'server/data/dashboard.sqlite'),
+    ];
+
+    const targetDb = candidatePaths.find(p => p && fs.existsSync(p));
+
+    if (!targetDb) {
+      return res.status(404).json({ error: 'Arquivo de banco de dados não encontrado no servidor.' });
     }
 
     const dateStr = new Date().toISOString().slice(0, 10);
     const filename = `backup-amura-dashboard-${dateStr}.sqlite`;
+
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Content-Type', 'application/x-sqlite3');
-    res.download(dbPath, filename);
+    res.download(targetDb, filename);
   } catch (err: any) {
     console.error('[Admin API] Erro ao gerar backup:', err);
     res.status(500).json({ error: err.message });
