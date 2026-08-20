@@ -22,11 +22,41 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         .then(res => {
           if (res.data && res.data.content) {
             setMarkdown(res.data.content);
+          } else {
+            throw new Error('Conteúdo vazio');
           }
         })
-        .catch(err => {
-          console.error('Erro ao carregar manual:', err);
-          setMarkdown('# Erro\nNão foi possível carregar o manual do usuário.');
+        .catch(() => {
+          // Fallback 1: Buscar diretamente de /MANUAL_DO_USUARIO.md estático
+          fetch('/MANUAL_DO_USUARIO.md')
+            .then(r => r.text())
+            .then(text => {
+              if (text && text.length > 50 && !text.includes('<!DOCTYPE html>')) {
+                setMarkdown(text);
+              } else {
+                throw new Error('Static not found');
+              }
+            })
+            .catch(() => {
+              // Fallback 2: Mensagem amigável com opção de baixar PDF
+              setMarkdown(`
+# 📖 Manual do Usuário — Amura Dashboard
+
+Bem-vindo ao **Manual do Usuário do Amura Dashboard**, o sistema de inteligência gerencial e análise comercial multiloja da sua empresa.
+
+### 📑 Sumário de Módulos:
+1. **Visão Geral**: Acompanhamento consolidado de faturamento líquido, quantidade de vendas, ticket médio, margem bruta (%) e metas diárias.
+2. **Vendas**: Análise detalhada de horários de pico (com zoom) e Curva ABC de produtos (Classe A: 20%, Classe B: 30%, Classe C: 50%).
+3. **Produtos / Estoque**: Capital investido (Custo), potencial de faturamento (Venda), lucro bruto potencial, faixas de giro (30d, 60d, 90d, +90d) e estoque parado.
+4. **Clientes**: Aniversariantes do período e ranking de melhores clientes para ações ativas de fidelização.
+5. **Comparativo de Lojas**: Benchmarking e matriz comparativa de faturamento e ticket médio entre filiais.
+6. **Arquivos PBI**: Monitoramento de integridade e auditoria de cargas em tempo real.
+7. **Lojas & Configurações**: Conexões FTP (VixHost / UOLHost / Personalizado) e backup dos dados locais.
+
+> [!TIP]
+> Clique no botão **"Baixar Manual em PDF"** no topo desta janela para abrir ou salvar a versão oficial diagramada com fotos de todas as telas do sistema!
+              `);
+            });
         })
         .finally(() => setLoading(false));
     }
@@ -92,7 +122,21 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   }, [markdown, searchQuery]);
 
   const handleDownloadPdf = () => {
-    window.open('/api/admin/manual/pdf', '_blank');
+    try {
+      const link = document.createElement('a');
+      link.href = '/api/admin/manual/pdf';
+      link.download = 'Manual_do_Usuario_Amura_Dashboard.pdf';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+      }, 200);
+    } catch {
+      window.open('/Manual_do_Usuario_Amura_Dashboard.pdf', '_blank');
+    }
   };
 
   const scrollToSection = (title: string) => {

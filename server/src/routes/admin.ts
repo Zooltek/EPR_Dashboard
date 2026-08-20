@@ -252,15 +252,21 @@ adminRouter.get('/sync-status', (req: Request, res: Response) => {
 
 // 10. Manual do Usuário (Markdown e PDF)
 adminRouter.get('/manual/markdown', (req: Request, res: Response) => {
+  const clientDist = process.env.CLIENT_DIST_DIR || path.join(__dirname, '../../client/dist');
+  const resPath = (process as any).resourcesPath || '';
   const possiblePaths = [
-    path.join(__dirname, '../../../MANUAL_DO_USUARIO.md'),
     path.join(process.cwd(), 'MANUAL_DO_USUARIO.md'),
+    path.join(clientDist, 'MANUAL_DO_USUARIO.md'),
+    path.join(__dirname, '../../../MANUAL_DO_USUARIO.md'),
     path.join(__dirname, '../../MANUAL_DO_USUARIO.md'),
     path.join(__dirname, '../MANUAL_DO_USUARIO.md'),
+    path.join(resPath, 'MANUAL_DO_USUARIO.md'),
+    path.join(resPath, 'app/MANUAL_DO_USUARIO.md'),
+    path.join(resPath, 'app/client/dist/MANUAL_DO_USUARIO.md'),
   ];
   let content = '';
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
+    if (p && fs.existsSync(p)) {
       content = fs.readFileSync(p, 'utf-8');
       break;
     }
@@ -272,15 +278,21 @@ adminRouter.get('/manual/markdown', (req: Request, res: Response) => {
 });
 
 adminRouter.get('/manual/pdf', (req: Request, res: Response) => {
+  const clientDist = process.env.CLIENT_DIST_DIR || path.join(__dirname, '../../client/dist');
+  const resPath = (process as any).resourcesPath || '';
   const possiblePaths = [
-    path.join(__dirname, '../../../Manual_do_Usuario_Amura_Dashboard.pdf'),
     path.join(process.cwd(), 'Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(clientDist, 'Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(__dirname, '../../../Manual_do_Usuario_Amura_Dashboard.pdf'),
     path.join(__dirname, '../../Manual_do_Usuario_Amura_Dashboard.pdf'),
     path.join(__dirname, '../Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(resPath, 'Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(resPath, 'app/Manual_do_Usuario_Amura_Dashboard.pdf'),
+    path.join(resPath, 'app/client/dist/Manual_do_Usuario_Amura_Dashboard.pdf'),
   ];
   let pdfPath = '';
   for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
+    if (p && fs.existsSync(p)) {
       pdfPath = p;
       break;
     }
@@ -288,6 +300,8 @@ adminRouter.get('/manual/pdf', (req: Request, res: Response) => {
   if (!pdfPath) {
     return res.status(404).json({ error: 'PDF do Manual não encontrado.' });
   }
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', 'attachment; filename="Manual_do_Usuario_Amura_Dashboard.pdf"');
   res.download(pdfPath, 'Manual_do_Usuario_Amura_Dashboard.pdf');
 });
 

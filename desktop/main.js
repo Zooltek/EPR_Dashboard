@@ -220,12 +220,21 @@ function createMainWindow() {
         { label: 'Forçar Recarregamento', role: 'forceReload', accelerator: 'CmdOrCtrl+Shift+R' },
         { type: 'separator' },
         { label: 'Alternar Tela Cheia', role: 'togglefullscreen' },
-        { label: 'Ferramentas do Desenvolvedor (DevTools)', role: 'toggleDevTools', accelerator: 'F12' },
       ],
     },
     {
       label: 'Ajuda',
       submenu: [
+        {
+          label: 'Manual do Usuário (PDF)',
+          accelerator: 'F1',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('open-help-modal');
+            }
+          },
+        },
+        { type: 'separator' },
         {
           label: 'Sobre o Amura Dashboard',
           click: () => {

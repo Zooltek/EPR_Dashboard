@@ -35,6 +35,8 @@
       "client/dist/**/*",
       "PBI/**/*",
       "Logo Amura.png",
+      "MANUAL_DO_USUARIO.md",
+      "Manual_do_Usuario_Amura_Dashboard.pdf",
       "package.json",
       "node_modules/**/*"
     ],

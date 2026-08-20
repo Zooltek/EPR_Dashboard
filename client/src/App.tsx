@@ -26,6 +26,14 @@ export const App: React.FC = () => {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+
+    const win = window as any;
+    if (win.electronAPI?.onOpenHelpModal) {
+      win.electronAPI.onOpenHelpModal(() => {
+        setIsHelpOpen(true);
+      });
+    }
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
@@ -163,7 +171,6 @@ export const App: React.FC = () => {
           toggleTheme={toggleTheme}
           onRefreshSync={handleRefreshSync}
           onToggleMobileMenu={() => setIsMobileSidebarOpen(prev => !prev)}
-          onOpenHelp={() => setIsHelpOpen(true)}
         />
 
         {activeTab === 'visao-geral' && (

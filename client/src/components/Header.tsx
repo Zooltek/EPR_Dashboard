@@ -5,8 +5,7 @@ import {
   RefreshCw, 
   Sun, 
   Moon,
-  Menu,
-  HelpCircle
+  Menu
 } from 'lucide-react';
 import type { FilterState, FilterOptions } from '../types';
 
@@ -20,7 +19,6 @@ interface HeaderProps {
   toggleTheme: () => void;
   onRefreshSync?: () => void;
   onToggleMobileMenu?: () => void;
-  onOpenHelp?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,7 +31,6 @@ export const Header: React.FC<HeaderProps> = ({
   toggleTheme,
   onRefreshSync,
   onToggleMobileMenu,
-  onOpenHelp,
 }) => {
   const titles: Record<string, { title: string; subtitle: string }> = {
     'visao-geral': { title: 'Visão Geral', subtitle: 'Acompanhamento consolidado dos principais KPIs e faturamento.' },
@@ -89,18 +86,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          {onOpenHelp && (
-            <button 
-              className="theme-toggle-btn" 
-              onClick={onOpenHelp} 
-              title="Abrir Manual do Usuário e Documentação (Atalho: F1)"
-              style={{ color: '#f97316' }}
-            >
-              <HelpCircle size={14} color="#f97316" />
-              <span>Ajuda <kbd style={{ fontSize: '0.65rem', background: 'rgba(249, 115, 22, 0.15)', padding: '1px 4px', borderRadius: '3px' }}>F1</kbd></span>
-            </button>
-          )}
-
           <button className="theme-toggle-btn" onClick={toggleTheme} title="Alternar entre Tema Claro e Escuro">
             {theme === 'dark' ? <Sun size={14} color="#f59e0b" /> : <Moon size={14} color="#6366f1" />}
             <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}</span>
