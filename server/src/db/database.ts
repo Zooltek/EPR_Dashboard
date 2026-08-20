@@ -235,6 +235,16 @@ export function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_produto_colecao ON produto(colecao_id);
   `);
 
+  // Ensure Default Empresa exists
+  const empresaStmt = db.prepare(`SELECT count(*) as count FROM empresa`);
+  const empresaRow = empresaStmt.get() as { count: number };
+  if (empresaRow.count === 0) {
+    db.prepare(`
+      INSERT OR IGNORE INTO empresa (id, razao_social, cnpj, nome_fantasia, status)
+      VALUES (1, 'Empresa Principal', '00000000000000', 'Matriz', 'ATIVO')
+    `).run();
+  }
+
   // Ensure Default Sync Configuration exists
   const syncStmt = db.prepare(`SELECT count(*) as count FROM configuracao_sync`);
   const syncRow = syncStmt.get() as { count: number };

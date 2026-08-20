@@ -75,17 +75,30 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
   const { cnpj, dataPbi, horaPbi } = parsed;
 
   // 2. Check or auto-register store for CNPJ
+  // Guarantee an empresa exists
+  let emp = db.prepare(`SELECT id FROM empresa ORDER BY id ASC LIMIT 1`).get() as
+    | { id: number }
+    | undefined;
+  if (!emp) {
+    db.prepare(`
+      INSERT OR IGNORE INTO empresa (id, razao_social, cnpj, nome_fantasia, status)
+      VALUES (1, 'Empresa Principal', '00000000000000', 'Matriz', 'ATIVO')
+    `).run();
+    emp = { id: 1 };
+  }
+
   let store = db.prepare(`SELECT id, empresa_id FROM loja WHERE cnpj = ?`).get(cnpj) as
     | { id: number; empresa_id: number }
     | undefined;
 
   if (!store) {
+    const countLojas = (db.prepare(`SELECT count(*) as c FROM loja`).get() as { c: number }).c + 1;
     const insertLoja = db.prepare(`
       INSERT INTO loja (empresa_id, id_loja_erp, cnpj, nome, status)
-      VALUES (1, 1, ?, ?, 'ATIVO')
+      VALUES (?, ?, ?, ?, 'ATIVO')
     `);
-    const res = insertLoja.run(cnpj, `Loja ${cnpj}`);
-    store = { id: Number(res.lastInsertRowid), empresa_id: 1 };
+    const res = insertLoja.run(emp.id, countLojas, cnpj, `Loja ${cnpj}`);
+    store = { id: Number(res.lastInsertRowid), empresa_id: emp.id };
   }
 
   // 3. Idempotency Check
@@ -307,10 +320,20 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
         INSERT OR REPLACE INTO produto (ref_id, nome, unidade, marca_id, grupo_id, familia_id, colecao_id, preco_custo, preco_tab1, data_cad, data_alt)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+      const insMarca = db.prepare(`INSERT OR IGNORE INTO marca (id, nome) VALUES (?, ?)`);
+      const insGrupo = db.prepare(`INSERT OR IGNORE INTO grupo (id, nome) VALUES (?, ?)`);
+      const insFamilia = db.prepare(`INSERT OR IGNORE INTO familia (id, nome) VALUES (?, ?)`);
+      const insColecao = db.prepare(`INSERT OR IGNORE INTO colecao (id, nome) VALUES (?, ?)`);
+
       for (const item of produtos) {
+        if (item.idMarca) insMarca.run(item.idMarca, `Marca ${item.idMarca}`);
+        if (item.idGrupo) insGrupo.run(item.idGrupo, `Grupo ${item.idGrupo}`);
+        if (item.idFamilia) insFamilia.run(item.idFamilia, `Familia ${item.idFamilia}`);
+        if (item.idColecao) insColecao.run(item.idColecao, `Coleção ${item.idColecao}`);
+
         stmt.run(
           String(item.refID),
-          String(item.xNome || ''),
+          String(item.xNome || item.refID || ''),
           String(item.xUnidade || ''),
           item.idMarca || null,
           item.idGrupo || null,
@@ -333,12 +356,18 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
         INSERT OR REPLACE INTO estoque (loja_id, ref_id, cor_id, tamanho, qtd, data_alt)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
+      const insProd = db.prepare(`INSERT OR IGNORE INTO produto (ref_id, nome) VALUES (?, ?)`);
+      const insCor = db.prepare(`INSERT OR IGNORE INTO cor (id, nome) VALUES (?, ?)`);
+
       for (const item of estoques) {
+        insProd.run(String(item.refID), String(item.refID));
+        if (item.idCor) insCor.run(item.idCor, `Cor ${item.idCor}`);
+
         stmt.run(
           store.id,
           String(item.refID),
-          item.idCor,
-          String(item.cTamanho),
+          item.idCor || 0,
+          String(item.cTamanho || ''),
           Number(item.qtd) || 0.0,
           String(item.dAlt || '')
         );
@@ -409,7 +438,24 @@ export async function importPbiZip(zipFilePath: string): Promise<ImportResult> {
           cancelado, promocao, c_tabela, qtd, preco_bruto, preco_liq, total_bruto, total_liq
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
+      const insCab = db.prepare(`INSERT OR IGNORE INTO venda_cab (loja_id, d_venda, c_venda) VALUES (?, ?, ?)`);
+      const insProd = db.prepare(`INSERT OR IGNORE INTO produto (ref_id, nome) VALUES (?, ?)`);
+
+      // Deleta itens de vendas presentes no XML para garantir idempotência sem duplicação
+      const uniqueSales = new Set<string>();
       for (const item of itens) {
+        uniqueSales.add(`${item.dVenda}_${item.cVenda}`);
+      }
+      const delItems = db.prepare(`DELETE FROM venda_item WHERE loja_id = ? AND d_venda = ? AND c_venda = ?`);
+      for (const saleKey of uniqueSales) {
+        const [dVenda, cVenda] = saleKey.split('_');
+        delItems.run(store.id, dVenda, Number(cVenda));
+      }
+
+      for (const item of itens) {
+        insCab.run(store.id, String(item.dVenda), Number(item.cVenda));
+        insProd.run(String(item.refID), String(item.refID));
+
         stmt.run(
           store.id,
           String(item.dVenda),
