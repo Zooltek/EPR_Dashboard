@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import dotenv from 'dotenv';
 import { initDatabase } from './db/database';
-import { runFullSync, startPbiDirectoryWatcher } from './services/ftpSyncService';
+import { runFullSync, restartSyncScheduler } from './services/ftpSyncService';
 import { dashboardRouter } from './routes/dashboard';
 import { adminRouter } from './routes/admin';
 
@@ -67,16 +67,13 @@ app.listen(PORT, () => {
   console.log(`[Server] Amura Dashboard rodando em http://localhost:${PORT}`);
 
   const { getSyncConfig } = require('./services/ftpSyncService');
-  const cfg = getSyncConfig();
-  const localPbiDir = cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
-  
-  // 1. Iniciar File Watcher para detectar novos arquivos PBI em tempo real
-  startPbiDirectoryWatcher(localPbiDir);
+  // 1. Iniciar agendador de sincronização periódica e watcher dinâmicos
+  restartSyncScheduler();
 
   // 2. Executar Sincronização Inicial no Startup
   setTimeout(() => {
     console.log(`[Sync] Iniciando varredura inicial de arquivos...`);
-    runFullSync({ localDir: localPbiDir })
+    runFullSync()
       .then((res) => {
         console.log(`[Sync] ${res.message}`);
         res.importResults.forEach(r => {
@@ -87,23 +84,6 @@ app.listen(PORT, () => {
         console.error('[Sync] Erro na sincronização inicial:', err);
       });
   }, 200);
-
-  // 3. Agendador Periódico (Cron/Interval)
-  const syncIntervalMinutes = cfg.intervalo_minutos || parseInt(process.env.SYNC_INTERVAL_MINUTES || '5', 10);
-  if (cfg.auto_sync_ativo !== 0 && syncIntervalMinutes > 0) {
-    const intervalMs = syncIntervalMinutes * 60 * 1000;
-    console.log(`[Sync] Agendamento automático ativo a cada ${syncIntervalMinutes} minuto(s).`);
-    setInterval(() => {
-      console.log(`[Sync] Executando varredura periódica agendada...`);
-      runFullSync({ localDir: localPbiDir })
-        .then(res => {
-          if (res.importResults.some(r => r.status === 'ATUALIZADA' && (r.processedRecords || 0) > 0)) {
-            console.log(`[Sync] Novos registros processados na varredura periódica.`);
-          }
-        })
-        .catch(err => console.error('[Sync] Erro na varredura periódica:', err));
-    }, intervalMs);
-  }
 });
 
 

@@ -9,6 +9,7 @@ export const PbiFilesPage: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [uploadFeedback, setUploadFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [syncConfig, setSyncConfig] = useState<{ modo_sincronizacao?: 'FTP' | 'LOCAL' | 'AMBOS'; pasta_local_pbi?: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchLogs = () => {
@@ -19,22 +20,33 @@ export const PbiFilesPage: React.FC = () => {
       .finally(() => setLoading(false));
   };
 
+  const fetchConfig = () => {
+    api.get('/api/admin/config-sync')
+      .then(res => setSyncConfig(res.data))
+      .catch(() => {});
+  };
+
   useEffect(() => {
     fetchLogs();
+    fetchConfig();
 
-    const handleSync = () => fetchLogs();
+    const handleSync = () => {
+      fetchLogs();
+      fetchConfig();
+    };
     window.addEventListener('pbi_sync_completed', handleSync);
     return () => window.removeEventListener('pbi_sync_completed', handleSync);
   }, []);
 
   const handleManualSync = () => {
     setSyncing(true);
+    setUploadFeedback(null);
     api.post('/api/admin/sync-pbi')
       .then(res => {
-        const count = res.data.remoteFilesFound?.length ?? res.data.downloadedFiles?.length ?? res.data.importResults?.length ?? res.data.count ?? 0;
-        const msg = res.data.ftpMessage || `Sincronização executada! ${count} arquivo(s) verificado(s).`;
+        const msg = res.data.message || `Sincronização executada com sucesso!`;
         setUploadFeedback({ type: 'success', message: msg });
         fetchLogs();
+        window.dispatchEvent(new CustomEvent('pbi_sync_completed', { detail: res.data }));
       })
       .catch(err => {
         const errMsg = err.response?.data?.error || err.message;
@@ -189,9 +201,28 @@ export const PbiFilesPage: React.FC = () => {
               <FileCheck size={20} color="var(--primary)" /> Histórico de Arquivos PBI e Processamento de Cargas
             </span>
 
-            <button className="btn-primary" onClick={handleManualSync} disabled={syncing}>
+            <button 
+              className="btn-primary" 
+              onClick={handleManualSync} 
+              disabled={syncing}
+              title={
+                syncConfig?.modo_sincronizacao === 'LOCAL'
+                  ? `Escanear pasta local configurada (${syncConfig.pasta_local_pbi || 'PBI'}) por novos arquivos .zip`
+                  : syncConfig?.modo_sincronizacao === 'AMBOS'
+                  ? 'Sincronizar tanto a pasta local quanto o servidor FTP'
+                  : 'Sincronizar arquivos PBI via FTP'
+              }
+            >
               <RefreshCw size={14} className={syncing ? 'spin' : ''} />
-              <span>{syncing ? 'Verificando FTP/PBI...' : 'Verificar / Sincronizar FTP'}</span>
+              <span>
+                {syncing
+                  ? 'Sincronizando...'
+                  : syncConfig?.modo_sincronizacao === 'LOCAL'
+                  ? 'Verificar Pasta Local / Rede'
+                  : syncConfig?.modo_sincronizacao === 'AMBOS'
+                  ? 'Sincronizar FTP & Pasta Local'
+                  : 'Verificar / Sincronizar FTP'}
+              </span>
             </button>
           </div>
 

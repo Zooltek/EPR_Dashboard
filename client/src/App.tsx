@@ -139,13 +139,18 @@ export const App: React.FC = () => {
     fetchOverview();
   }, [filters]);
 
+  const [isHeaderSyncing, setIsHeaderSyncing] = useState<boolean>(false);
+
   const handleRefreshSync = () => {
+    setIsHeaderSyncing(true);
     api.post('/api/admin/sync-pbi')
-      .then(() => {
+      .then((res) => {
         fetchFilters();
         fetchOverview();
+        window.dispatchEvent(new CustomEvent('pbi_sync_completed', { detail: res.data }));
       })
-      .catch(err => console.error(err));
+      .catch(err => console.error(err))
+      .finally(() => setIsHeaderSyncing(false));
   };
 
   return (
@@ -170,6 +175,7 @@ export const App: React.FC = () => {
           theme={theme}
           toggleTheme={toggleTheme}
           onRefreshSync={handleRefreshSync}
+          isSyncing={isHeaderSyncing}
           onToggleMobileMenu={() => setIsMobileSidebarOpen(prev => !prev)}
         />
 

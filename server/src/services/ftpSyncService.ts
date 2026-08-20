@@ -134,10 +134,8 @@ export function saveSyncConfig(cfg: Partial<SyncConfig>): SyncConfig {
     updated.auto_sync_ativo !== undefined ? updated.auto_sync_ativo : 1
   );
 
-  // Restart watcher if local path changed
-  if (updated.pasta_local_pbi) {
-    startPbiDirectoryWatcher(updated.pasta_local_pbi);
-  }
+  // Restart scheduler & watcher immediately with the updated configuration
+  restartSyncScheduler();
 
   return getSyncConfig();
 }
@@ -178,7 +176,7 @@ export function incrementSyncVersion() {
 }
 
 /**
- * Processa todos os arquivos .zip de um diretório local
+ * Processa todos os arquivos .zip de um diretório local ou de rede
  */
 export async function syncLocalPbiFolder(targetDir?: string): Promise<{
   dirScanned: string;
@@ -186,8 +184,16 @@ export async function syncLocalPbiFolder(targetDir?: string): Promise<{
   importResults: ImportResult[];
 }> {
   const cfg = getSyncConfig();
-  const pbiDir = targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
-  const resolvedPath = path.isAbsolute(pbiDir) ? pbiDir : path.resolve(process.cwd(), pbiDir);
+  let rawDir = (targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI')).trim();
+  
+  // Remove aspas caso o usuário tenha colado caminho com aspas (ex: "C:\pasta" ou 'C:\pasta')
+  if ((rawDir.startsWith('"') && rawDir.endsWith('"')) || (rawDir.startsWith("'") && rawDir.endsWith("'"))) {
+    rawDir = rawDir.slice(1, -1).trim();
+  }
+
+  // Tratamento para caminhos de rede UNC (ex: \\servidor\pasta) ou caminhos absolutos/relativos
+  const isUncPath = rawDir.startsWith('\\\\') || rawDir.startsWith('//');
+  const resolvedPath = isUncPath ? rawDir : (path.isAbsolute(rawDir) ? path.normalize(rawDir) : path.resolve(process.cwd(), rawDir));
 
   const filesFound: string[] = [];
   const importResults: ImportResult[] = [];
@@ -197,8 +203,14 @@ export async function syncLocalPbiFolder(targetDir?: string): Promise<{
     return { dirScanned: resolvedPath, filesFound, importResults };
   }
 
-  console.log(`[PBI Local] Escaneando pasta local por arquivos PBI: ${resolvedPath}`);
-  const entries = fs.readdirSync(resolvedPath);
+  console.log(`[PBI Local] 🔍 Escaneando pasta local por arquivos PBI: ${resolvedPath}`);
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(resolvedPath);
+  } catch (err: any) {
+    console.error(`[PBI Local] Erro ao listar diretório ${resolvedPath}:`, err.message);
+    return { dirScanned: resolvedPath, filesFound, importResults };
+  }
   const zipFiles = entries.filter(isPbiZip);
 
   for (const zip of zipFiles) {
@@ -521,9 +533,18 @@ export async function runFullSync(options?: { localDir?: string; ftp?: FtpSyncOp
 
   const combinedResults = [...localRes.importResults, ...ftpRes.importResults];
 
+  let modeSummaryMsg = '';
+  if (mode === 'LOCAL') {
+    modeSummaryMsg = `Sincronização de Pasta Local concluída. ${localRes.filesFound.length} arquivo(s) encontrado(s) em "${localRes.dirScanned}".`;
+  } else if (mode === 'FTP') {
+    modeSummaryMsg = `Sincronização FTP concluída. ${ftpRes.downloadedFiles.length} arquivo(s) baixado(s) e processado(s).`;
+  } else {
+    modeSummaryMsg = `Sincronização híbrida (Local & FTP) concluída. ${localRes.filesFound.length} local(is) e ${ftpRes.downloadedFiles.length} do FTP.`;
+  }
+
   return {
     success: true,
-    message: `Sincronização concluída (${mode}). ${localRes.filesFound.length} arquivo(s) locais e ${ftpRes.downloadedFiles.length} baixados do FTP.`,
+    message: modeSummaryMsg,
     localDirScanned: localRes.dirScanned,
     localFilesFound: localRes.filesFound,
     ftpConnected: ftpRes.ftpConnected,
@@ -547,8 +568,14 @@ const debounceTimers = new Map<string, NodeJS.Timeout>();
 
 export function startPbiDirectoryWatcher(targetDir?: string) {
   const cfg = getSyncConfig();
-  const pbiDir = targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI');
-  const resolvedPath = path.isAbsolute(pbiDir) ? pbiDir : path.resolve(process.cwd(), pbiDir);
+  let rawDir = (targetDir || cfg.pasta_local_pbi || process.env.LOCAL_PBI_DIR || path.join(__dirname, '../../../PBI')).trim();
+  
+  if ((rawDir.startsWith('"') && rawDir.endsWith('"')) || (rawDir.startsWith("'") && rawDir.endsWith("'"))) {
+    rawDir = rawDir.slice(1, -1).trim();
+  }
+
+  const isUncPath = rawDir.startsWith('\\\\') || rawDir.startsWith('//');
+  const resolvedPath = isUncPath ? rawDir : (path.isAbsolute(rawDir) ? path.normalize(rawDir) : path.resolve(process.cwd(), rawDir));
 
   if (!fs.existsSync(resolvedPath)) {
     console.log(`[PBI Watcher] Pasta local não encontrada para monitoramento em tempo real: ${resolvedPath}`);
@@ -580,6 +607,9 @@ export function startPbiDirectoryWatcher(targetDir?: string) {
             try {
               const res = await importPbiZip(fullPath);
               console.log(`[PBI Watcher] ✅ ${filename}: ${res.status} (${res.processedRecords || 0} registros)`);
+              if (res.success && (res.processedRecords || 0) > 0) {
+                incrementSyncVersion();
+              }
             } catch (err: any) {
               console.error(`[PBI Watcher] ❌ Erro ao processar ${filename}:`, err.message);
             }
@@ -589,6 +619,48 @@ export function startPbiDirectoryWatcher(targetDir?: string) {
     });
   } catch (err: any) {
     console.error(`[PBI Watcher] Erro ao iniciar watcher na pasta ${resolvedPath}:`, err.message);
+  }
+}
+
+/**
+ * Agendador Periódico Dinâmico (Sincronização em Background)
+ */
+let syncIntervalTimer: NodeJS.Timeout | null = null;
+
+export function restartSyncScheduler() {
+  if (syncIntervalTimer) {
+    clearInterval(syncIntervalTimer);
+    syncIntervalTimer = null;
+  }
+
+  const cfg = getSyncConfig();
+  const intervalMinutes = Number(cfg.intervalo_minutos) || 5;
+  const isAutoSyncActive = cfg.auto_sync_ativo !== 0;
+
+  console.log(`[Sync Scheduler] Configurando agendador: Modo=${cfg.modo_sincronizacao}, Ativo=${isAutoSyncActive}, Intervalo=${intervalMinutes} min, PastaLocal="${cfg.pasta_local_pbi || ''}"`);
+
+  // Start real-time file watcher if local folder is specified and mode is LOCAL or AMBOS
+  if ((cfg.modo_sincronizacao === 'LOCAL' || cfg.modo_sincronizacao === 'AMBOS') && cfg.pasta_local_pbi) {
+    startPbiDirectoryWatcher(cfg.pasta_local_pbi);
+  }
+
+  if (isAutoSyncActive && intervalMinutes > 0) {
+    const intervalMs = intervalMinutes * 60 * 1000;
+    console.log(`[Sync Scheduler] ⏱️ Agendador periódico ativo: sincronizando a cada ${intervalMinutes} minuto(s) (${intervalMs}ms).`);
+    
+    syncIntervalTimer = setInterval(() => {
+      console.log(`[Sync Scheduler] 🚀 Disparando varredura periódica automática (${new Date().toLocaleTimeString('pt-BR')})...`);
+      runFullSync()
+        .then(res => {
+          console.log(`[Sync Scheduler] Concluído: ${res.message}`);
+          if (res.importResults.some(r => r.status === 'ATUALIZADA' && (r.processedRecords || 0) > 0)) {
+            console.log(`[Sync Scheduler] Novos registros integrados à base de dados.`);
+          }
+        })
+        .catch(err => console.error('[Sync Scheduler] Erro na varredura periódica:', err.message));
+    }, intervalMs);
+  } else {
+    console.log(`[Sync Scheduler] Sincronização periódica desativada (auto_sync_ativo=${cfg.auto_sync_ativo}).`);
   }
 }
 

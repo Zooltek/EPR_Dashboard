@@ -18,6 +18,7 @@ interface HeaderProps {
   theme: 'dark' | 'light';
   toggleTheme: () => void;
   onRefreshSync?: () => void;
+  isSyncing?: boolean;
   onToggleMobileMenu?: () => void;
 }
 
@@ -30,6 +31,7 @@ export const Header: React.FC<HeaderProps> = ({
   theme,
   toggleTheme,
   onRefreshSync,
+  isSyncing = false,
   onToggleMobileMenu,
 }) => {
   const titles: Record<string, { title: string; subtitle: string }> = {
@@ -106,8 +108,13 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {onRefreshSync && (
-            <button className="btn-period" onClick={onRefreshSync} title="Sincronizar FTP / PBI">
-              <RefreshCw size={14} />
+            <button 
+              className="btn-period" 
+              onClick={onRefreshSync} 
+              disabled={isSyncing}
+              title="Sincronizar FTP / PBI"
+            >
+              <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
             </button>
           )}
         </div>
